@@ -29,7 +29,7 @@ test('manifest is MV3 with name, description, and icons', function () {
   assert.equal(manifest.manifest_version, 3);
   assert.ok(manifest.name && manifest.name.length <= 45);
   assert.ok(manifest.description && manifest.description.length <= 132);
-  assert.equal(manifest.version, '1.0.0');
+  assert.equal(manifest.version, '1.0.1');
   for (const size of ['16', '32', '48', '128']) {
     assert.ok(manifest.icons[size]);
     const file = path.join(root, manifest.icons[size]);

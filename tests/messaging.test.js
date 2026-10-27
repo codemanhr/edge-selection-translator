@@ -27,6 +27,16 @@ function runtimeWith(sendMessage) {
   };
 }
 
+function answerPing(onTranslate) {
+  return function (message, callback) {
+    if (message && message.type === 'est-ping') {
+      callback({ ok: true });
+      return;
+    }
+    onTranslate(message, callback);
+  };
+}
+
 function linkedPorts() {
   const clientListeners = [];
   const serverListeners = [];
@@ -64,34 +74,34 @@ function linkedPorts() {
 }
 
 test('callback sendMessage resolves with the worker response', async function () {
-  const runtime = runtimeWith(function (message, callback) {
+  const runtime = runtimeWith(answerPing(function (message, callback) {
     assert.equal(message.type, 'translate');
     runtime.lastError = undefined;
     callback({ ok: true, translatedText: '你好' });
-  });
+  }));
   const response = await sendExtensionMessage({ type: 'translate', text: 'Hello' }, runtime, { delay: immediate });
   assert.equal(response.translatedText, '你好');
 });
 
 test('a sleeping worker is retried, and an invalidated context is not', async function () {
   let calls = 0;
-  const runtime = runtimeWith(function (message, callback) {
+  const runtime = runtimeWith(answerPing(function (message, callback) {
     calls += 1;
     runtime.lastError = calls === 1
       ? { message: 'Could not establish connection. Receiving end does not exist.' }
       : undefined;
     callback(calls === 1 ? undefined : { ok: true, translatedText: '你好' });
-  });
+  }));
   const response = await sendExtensionMessage({ type: 'translate' }, runtime, { delay: immediate });
   assert.equal(calls, 2);
   assert.equal(response.ok, true);
 
   let closed = 0;
-  const sleepy = runtimeWith(function (message, callback) {
+  const sleepy = runtimeWith(answerPing(function (message, callback) {
     closed += 1;
     sleepy.lastError = { message: 'The message port closed before a response was received.' };
     callback();
-  });
+  }));
   await assert.rejects(
     sendExtensionMessage({ type: 'translate' }, sleepy, { attempts: 3, delay: immediate }),
     /message port closed/
@@ -118,21 +128,21 @@ test('a sleeping worker is retried, and an invalidated context is not', async fu
 
 test('a callback response is kept when Edge also sets lastError', async function () {
   let calls = 0;
-  const runtime = runtimeWith(function (message, callback) {
+  const runtime = runtimeWith(answerPing(function (message, callback) {
     calls += 1;
     runtime.lastError = { message: 'The message port closed before a response was received.' };
     callback({ ok: true, translatedText: '你好' });
-  });
+  }));
   const response = await sendExtensionMessage({ type: 'translate' }, runtime, { delay: immediate });
   assert.equal(calls, 1);
   assert.equal(response.translatedText, '你好');
 
   let dead = 0;
-  const invalidated = runtimeWith(function (message, callback) {
+  const invalidated = runtimeWith(answerPing(function (message, callback) {
     dead += 1;
     invalidated.lastError = { message: 'Extension context invalidated.' };
     callback({ ok: true, translatedText: '你好' });
-  });
+  }));
   await assert.rejects(
     sendExtensionMessage({ type: 'translate' }, invalidated, { delay: immediate }),
     /invalidated/
@@ -143,8 +153,19 @@ test('a callback response is kept when Edge also sets lastError', async function
 test('reload and connect failure use different panel messages', async function () {
   assert.equal(userFacingBackgroundError(new Error('Extension context invalidated.')), MESSAGE_RELOAD);
   assert.equal(MESSAGE_RELOAD, '扩展已重新加载，请刷新此页面后再翻译');
-  assert.equal(userFacingBackgroundError(new Error('Could not establish connection. Receiving end does not exist.')), MESSAGE_UNREACHABLE);
-  assert.equal(userFacingBackgroundError(new Error('The message port closed before a response was received.')), MESSAGE_UNREACHABLE);
+  assert.equal(
+    userFacingBackgroundError(new Error('Could not establish connection. Receiving end does not exist.')),
+    '无法连接扩展后台（Could not establish connection. Receiving end does not exist.）'
+  );
+  assert.equal(
+    userFacingBackgroundError(new Error('The message port closed before a response was received.')),
+    '无法连接扩展后台（The message port closed before a response was received.）'
+  );
+  assert.equal(userFacingBackgroundError(new Error('无法连接扩展后台')), MESSAGE_UNREACHABLE);
+  const noisy = userFacingBackgroundError(new Error('Receiving end does not exist. ' + 'x'.repeat(80)));
+  assert.match(noisy, /^无法连接扩展后台（/);
+  assert.ok(noisy.endsWith('…）'));
+  assert.ok(noisy.length < 120);
   assert.equal(MESSAGE_UNREACHABLE, '无法连接扩展后台');
   assert.notEqual(MESSAGE_RELOAD, MESSAGE_UNREACHABLE);
   assert.equal(userFacingBackgroundError(new Error('翻译失败')), '翻译失败');
@@ -198,30 +219,55 @@ test('wake helper rethrows invalidation and ignores a sleeping worker', function
   });
 });
 
-test('a port wakes a sleeping worker once, then translates on est-ready', async function () {
+test('translate is sent on the next turn after the ping, and connect is not opened', async function () {
+  const order = [];
   let connects = 0;
-  let pings = 0;
+  const runtime = {
+    lastError: undefined,
+    sendMessage: function (message, callback) {
+      order.push(message.type);
+      if (message.type === 'est-ping') {
+        callback({ ok: true });
+        order.push('ping-returned');
+        return;
+      }
+      assert.equal(message.type, 'translate');
+      assert.equal(message.text, 'Hello');
+      callback({ ok: true, translatedText: '你好' });
+    },
+    connect: function () {
+      connects += 1;
+      throw new Error('connect should not run before sendMessage succeeds');
+    }
+  };
+  const response = await sendExtensionMessage(
+    { type: 'translate', text: 'Hello' },
+    runtime,
+    { delay: immediate }
+  );
+  assert.equal(response.translatedText, '你好');
+  assert.deepEqual(order, ['est-ping', 'ping-returned', 'translate']);
+  assert.equal(connects, 0);
+});
+
+test('a failed sendMessage falls back to the translate port', async function () {
   let translates = 0;
+  let connects = 0;
   let alive = 0;
   let stopped = 0;
   const runtime = {
     lastError: undefined,
-    sendMessage: function (message, callback) {
-      assert.equal(message.type, 'est-ping');
-      pings += 1;
-      if (callback) callback();
-    },
+    sendMessage: answerPing(function (message, callback) {
+      translates += 1;
+      runtime.lastError = { message: 'Could not establish connection. Receiving end does not exist.' };
+      callback();
+    }),
     connect: function (info) {
-      assert.equal(info.name, TRANSLATE_PORT);
       connects += 1;
-      if (connects === 1) {
-        throw new Error('Could not establish connection. Receiving end does not exist.');
-      }
+      assert.equal(info.name, TRANSLATE_PORT);
       const ends = linkedPorts();
       attachTranslatePort(ends.server, {
         translate: function (message) {
-          translates += 1;
-          assert.equal(message.type, 'translate');
           assert.equal(message.text, 'Hello');
           return Promise.resolve({ ok: true, translatedText: '你好', engine: 'bing' });
         },
@@ -236,14 +282,12 @@ test('a port wakes a sleeping worker once, then translates on est-ready', async 
   const response = await sendExtensionMessage(
     { type: 'translate', text: 'Hello' },
     runtime,
-    { delay: immediate }
+    { attempts: 2, delay: immediate }
   );
+  assert.equal(translates, 2);
+  assert.equal(connects, 1);
   assert.equal(response.translatedText, '你好');
-  assert.equal(response.ok, true);
   assert.equal(response.type, undefined);
-  assert.equal(connects, 2);
-  assert.equal(pings, 2);
-  assert.equal(translates, 1);
   assert.equal(alive, 1);
   assert.equal(stopped, 1);
 });
@@ -252,7 +296,6 @@ test('port disconnect retries, invalidation and handshake timeout do not loop fo
   let connects = 0;
   const runtime = {
     lastError: { message: 'Could not establish connection. Receiving end does not exist.' },
-    sendMessage: function (message, callback) { if (callback) callback(); },
     connect: function () {
       connects += 1;
       if (connects === 1) {
@@ -276,7 +319,6 @@ test('port disconnect retries, invalidation and handshake timeout do not loop fo
 
   let dead = 0;
   const invalidated = {
-    sendMessage: function (message, callback) { if (callback) callback(); },
     connect: function () {
       dead += 1;
       throw new Error('Extension context invalidated.');
@@ -291,7 +333,6 @@ test('port disconnect retries, invalidation and handshake timeout do not loop fo
 
   let timed = 0;
   const hanging = {
-    sendMessage: function (message, callback) { if (callback) callback(); },
     connect: function () {
       timed += 1;
       return {
@@ -321,7 +362,8 @@ test('port disconnect retries, invalidation and handshake timeout do not loop fo
     });
     assert.fail('expected timeout');
   } catch (err) {
-    assert.equal(userFacingBackgroundError(err), MESSAGE_UNREACHABLE);
+    assert.match(String(err && err.message), /Receiving end does not exist/);
+    assert.match(userFacingBackgroundError(err), /^无法连接扩展后台（Could not establish connection/);
   }
 });
 
@@ -330,10 +372,14 @@ test('the worker answers translate on a port and keeps the panel request', funct
   const manifest = JSON.parse(fs.readFileSync(path.join(root, 'manifest.json'), 'utf8'));
   const scripts = manifest.content_scripts[0].js;
   assert.match(worker, /messaging\.js/);
+  assert.match(worker, /try \{[\s\S]*importScripts\('\.\.\/lib\/messaging\.js'\)/);
   assert.match(worker, /onConnect/);
   assert.match(worker, /TRANSLATE_PORT/);
+  assert.match(worker, /est-translate/);
+  assert.match(worker, /est-keepalive/);
   assert.match(worker, /attachTranslatePort/);
   assert.match(worker, /est-ping/);
+  assert.match(worker, /\}, 400\)/);
   assert.match(worker, /message\.type === 'translate'/);
   assert.match(worker, /return true/);
   assert.match(worker, /message\.style/);

@@ -1,17 +1,24 @@
 (function (root, factory) {
   const api = factory();
-  if (typeof module === 'object' && module.exports) module.exports = api;
-  const EST = (root.EST = root.EST || {});
+  // A service worker that sees a broken `module` object must still publish EST.
+  // Otherwise importScripts throws and no listener is ever registered.
+  try {
+    if (typeof module === 'object' && module && module.exports) module.exports = api;
+  } catch (err) {}
+  const host = root || (typeof globalThis !== 'undefined' ? globalThis : {});
+  const EST = (host.EST = host.EST || {});
   Object.assign(EST, api);
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
   'use strict';
 
   const TRANSLATE_PORT = 'est-translate';
+  const KEEPALIVE_PORT = 'est-keepalive';
   const MESSAGE_RELOAD = '扩展已重新加载，请刷新此页面后再翻译';
   const MESSAGE_UNREACHABLE = '无法连接扩展后台';
-  const DEFAULT_ATTEMPTS = 5;
-  const HANDSHAKE_MS = 2000;
+  const DEFAULT_ATTEMPTS = 8;
+  const HANDSHAKE_MS = 2500;
   const RESULT_MS = 30000;
+  const WAKE_MS = 1000;
 
   function errorText(err) {
     return String((err && (err.message || err)) || '');
@@ -32,9 +39,19 @@
     return isContextInvalidated(err) || isRetryableConnectionError(err) || /无法连接扩展后台/.test(errorText(err));
   }
 
+  function shortLastError(err) {
+    const text = errorText(err).replace(/\s+/g, ' ').trim();
+    if (!text || text === MESSAGE_UNREACHABLE || text === MESSAGE_RELOAD) return '';
+    if (/^无法连接扩展后台/.test(text) && !/[A-Za-z]/.test(text)) return '';
+    return text.length > 80 ? text.slice(0, 79) + '…' : text;
+  }
+
   function userFacingBackgroundError(err) {
     if (isContextInvalidated(err)) return MESSAGE_RELOAD;
-    if (isRetryableConnectionError(err) || /无法连接扩展后台/.test(errorText(err))) return MESSAGE_UNREACHABLE;
+    if (isRetryableConnectionError(err) || /无法连接扩展后台/.test(errorText(err))) {
+      const detail = shortLastError(err);
+      return detail ? MESSAGE_UNREACHABLE + '（' + detail + '）' : MESSAGE_UNREACHABLE;
+    }
     return errorText(err) || '翻译失败';
   }
 
@@ -56,17 +73,39 @@
     }
   }
 
-  // Fire-and-forget ping. The callback form starts a stopped MV3 worker even
-  // when nobody answers the first message. Invalidation must surface; a
-  // sleeping worker must not.
-  function wakeExtensionWorker(runtime) {
-    if (!runtime || typeof runtime.sendMessage !== 'function') return;
+  function retryDelayMs(index) {
+    const steps = [200, 500, 1000, 1500, 2200, 3000, 4000];
+    return steps[index] || 4000;
+  }
+
+  // Callback form. `done` runs when the ping has been answered or has thrown
+  // a non-fatal error. Invalidation is rethrown. Calling done in the same
+  // turn as sendMessage is required so the caller can wait until Edge has
+  // actually started the worker before opening another channel.
+  function wakeExtensionWorker(runtime, done) {
+    function finish(err) {
+      if (typeof done === 'function') done(err);
+    }
+    if (!runtime || typeof runtime.sendMessage !== 'function') {
+      finish();
+      return;
+    }
     try {
       runtime.sendMessage({ type: 'est-ping' }, function () {
-        try { void runtime.lastError; } catch (err) {}
+        let last;
+        try { last = runtime.lastError; } catch (err) {
+          finish(isContextInvalidated(err) ? rejectError(err) : undefined);
+          return;
+        }
+        if (last && isContextInvalidated(last.message || last)) {
+          finish(new Error(last.message || String(last)));
+          return;
+        }
+        finish();
       });
     } catch (err) {
       if (isContextInvalidated(err)) throw rejectError(err);
+      finish();
     }
   }
 
@@ -95,6 +134,13 @@
     function ready() {
       post({ type: 'est-ready' });
     }
+    let poke = null;
+    let gotTranslate = false;
+    function stopPoke() {
+      if (poke == null) return;
+      clearInterval(poke);
+      poke = null;
+    }
     port.onMessage.addListener(function (message) {
       if (!message || !message.type) return;
       if (message.type === 'est-hello') {
@@ -102,6 +148,8 @@
         return;
       }
       if (message.type !== 'translate') return;
+      gotTranslate = true;
+      stopPoke();
       if (!stop) stop = keepAlive() || null;
       let pending;
       try {
@@ -120,9 +168,23 @@
       });
     });
     if (port.onDisconnect && typeof port.onDisconnect.addListener === 'function') {
-      port.onDisconnect.addListener(function () { finishKeepAlive(); });
+      port.onDisconnect.addListener(function () {
+        stopPoke();
+        finishKeepAlive();
+      });
     }
+    // Edge drops a postMessage made inside onConnect. Keep announcing
+    // est-ready until the translate payload shows up.
     ready();
+    if (!gotTranslate) {
+      try {
+        poke = setInterval(function () {
+          if (!gotTranslate) ready();
+        }, 250);
+      } catch (err) {
+        poke = null;
+      }
+    }
   }
 
   function sendExtensionMessage(message, runtime, options) {
@@ -144,20 +206,30 @@
     } catch (err) {
       return Promise.reject(rejectError(err));
     }
+    const portOptions = {
+      limit: Math.min(limit, 3),
+      delay: delay,
+      schedule: schedule,
+      cancel: cancel,
+      handshakeMs: handshakeMs,
+      resultMs: resultMs
+    };
     if (typeof runtime.connect !== 'function' && typeof runtime.sendMessage !== 'function') {
       return Promise.reject(new Error(MESSAGE_UNREACHABLE));
     }
-    if (typeof runtime.connect === 'function') {
-      return sendViaPort(message, runtime, {
-        limit: limit,
-        delay: delay,
-        schedule: schedule,
-        cancel: cancel,
-        handshakeMs: handshakeMs,
-        resultMs: resultMs
+    // Edge does not wake an inactive worker on runtime.connect, and a port
+    // opened in the same turn as the wake ping is disconnected. Deliver the
+    // translation with callback sendMessage after the ping returns. The port
+    // is only a fallback when sendMessage is missing or every attempt fails.
+    if (typeof runtime.sendMessage === 'function') {
+      return sendViaCallback(message, runtime, { limit: limit, delay: delay }).catch(function (err) {
+        if (typeof runtime.connect !== 'function' || !isRetryableConnectionError(err)) {
+          return Promise.reject(err);
+        }
+        return sendViaPort(message, runtime, portOptions);
       });
     }
-    return sendViaCallback(message, runtime, { limit: limit, delay: delay });
+    return sendViaPort(message, runtime, portOptions);
   }
 
   function sendViaPort(message, runtime, options) {
@@ -167,11 +239,16 @@
         let settled = false;
         let sent = false;
         let timer = null;
+        let helloTimer = null;
 
         function cleanup() {
           if (timer != null) {
             try { options.cancel(timer); } catch (err) {}
             timer = null;
+          }
+          if (helloTimer != null) {
+            clearTimeout(helloTimer);
+            helloTimer = null;
           }
           const current = port;
           port = null;
@@ -185,7 +262,7 @@
           cleanup();
           const wrapped = rejectError(err);
           if (isRetryableConnectionError(wrapped) && index + 1 < options.limit) {
-            options.delay(400 * (index + 1), function () { attempt(index + 1); });
+            options.delay(retryDelayMs(index), function () { attempt(index + 1); });
             return;
           }
           reject(wrapped);
@@ -233,13 +310,6 @@
         }
 
         try {
-          wakeExtensionWorker(runtime);
-        } catch (err) {
-          fail(err);
-          return;
-        }
-
-        try {
           port = runtime.connect({ name: TRANSLATE_PORT });
         } catch (err) {
           fail(err);
@@ -263,6 +333,13 @@
         // est-ready during hello already started the result timer. Replacing
         // it with the short handshake timeout would abort a slow translation.
         if (!settled && !sent) arm(options.handshakeMs);
+        if (!settled && !sent) {
+          helloTimer = setTimeout(function () {
+            helloTimer = null;
+            if (settled || sent || !port) return;
+            try { port.postMessage({ type: 'est-hello' }); } catch (err) {}
+          }, 50);
+        }
       }
       attempt(0);
     });
@@ -275,41 +352,72 @@
     return new Promise(function (resolve, reject) {
       function attempt(index) {
         let settled = false;
+        let wakeTimer = null;
         function fail(err) {
           if (settled) return;
           settled = true;
+          if (wakeTimer != null) {
+            clearTimeout(wakeTimer);
+            wakeTimer = null;
+          }
           const wrapped = rejectError(err);
           if (isRetryableConnectionError(wrapped) && index + 1 < options.limit) {
-            options.delay(400 * (index + 1), function () { attempt(index + 1); });
+            options.delay(retryDelayMs(index), function () { attempt(index + 1); });
             return;
           }
           reject(wrapped);
         }
-        try {
-          runtime.sendMessage(message, function (response) {
-            let last;
-            try { last = runtime.lastError; } catch (err) { fail(err); return; }
-            if (last && isContextInvalidated(last.message || last)) {
-              fail(new Error(last.message || String(last)));
-              return;
-            }
-            // Edge can set lastError when another frame returns false even
-            // though the worker already delivered a response.
-            if (response !== undefined) {
+        function deliver() {
+          if (settled) return;
+          try {
+            runtime.sendMessage(message, function (response) {
+              let last;
+              try { last = runtime.lastError; } catch (err) { fail(err); return; }
+              if (last && isContextInvalidated(last.message || last)) {
+                fail(new Error(last.message || String(last)));
+                return;
+              }
+              // Edge can set lastError when another frame returns false even
+              // though the worker already delivered a response.
+              if (response !== undefined) {
+                if (settled) return;
+                settled = true;
+                resolve(response);
+                return;
+              }
+              if (last) {
+                fail(new Error(last.message || String(last)));
+                return;
+              }
               if (settled) return;
               settled = true;
               resolve(response);
-              return;
-            }
-            if (last) {
-              fail(new Error(last.message || String(last)));
-              return;
-            }
-            if (settled) return;
-            settled = true;
-            resolve(response);
-          });
+            });
+          } catch (err) {
+            fail(err);
+          }
+        }
+        let woke = false;
+        function afterWake(err) {
+          if (woke || settled) return;
+          woke = true;
+          if (wakeTimer != null) {
+            clearTimeout(wakeTimer);
+            wakeTimer = null;
+          }
+          if (err && isContextInvalidated(err)) {
+            fail(err);
+            return;
+          }
+          // Next turn: Edge treats a second call in the ping callback as
+          // still attached to the failed channel.
+          setTimeout(deliver, 0);
+        }
+        wakeTimer = setTimeout(afterWake, WAKE_MS);
+        try {
+          wakeExtensionWorker(runtime, afterWake);
         } catch (err) {
+          if (wakeTimer != null) clearTimeout(wakeTimer);
           fail(err);
         }
       }
@@ -319,6 +427,7 @@
 
   return {
     TRANSLATE_PORT: TRANSLATE_PORT,
+    KEEPALIVE_PORT: KEEPALIVE_PORT,
     MESSAGE_RELOAD: MESSAGE_RELOAD,
     MESSAGE_UNREACHABLE: MESSAGE_UNREACHABLE,
     sendExtensionMessage: sendExtensionMessage,

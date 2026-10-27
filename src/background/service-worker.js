@@ -11,9 +11,11 @@ importScripts(
   '../lib/settings.js',
   '../lib/commands.js',
   '../lib/blacklist.js',
-  '../lib/history.js',
-  '../lib/messaging.js'
+  '../lib/history.js'
 );
+try {
+  importScripts('../lib/messaging.js');
+} catch (err) {}
 
 const authCache = EST.createAuthCache();
 
@@ -64,17 +66,29 @@ function translatePayload(message) {
 }
 
 // getPlatformInfo is a no-op event that keeps the worker alive until the
-// fetch chain calls sendResponse. Without it, Edge can close the port
-// while Bing or the fallback engines are still in flight.
+// fetch chain calls sendResponse. Call it immediately: Edge can suspend an
+// inactive worker before a 2s interval fires.
 function keepWorkerAlive() {
+  try { chrome.runtime.getPlatformInfo(function () {}); } catch (err) {}
   const timer = setInterval(function () {
     try { chrome.runtime.getPlatformInfo(function () {}); } catch (err) {}
-  }, 2000);
+  }, 400);
   return function () { clearInterval(timer); };
 }
 
 chrome.runtime.onConnect.addListener(function (port) {
-  if (!port || port.name !== EST.TRANSLATE_PORT) return;
+  if (!port || !port.name) return;
+  if (port.name === 'est-keepalive') {
+    const stop = keepWorkerAlive();
+    if (port.onDisconnect && port.onDisconnect.addListener) {
+      port.onDisconnect.addListener(function () { stop(); });
+    }
+    return;
+  }
+  // String compare first so a failed messaging.js import cannot make the
+  // worker ignore the port (EST.TRANSLATE_PORT would be undefined).
+  if (port.name !== 'est-translate' && port.name !== (EST && EST.TRANSLATE_PORT)) return;
+  if (!EST.attachTranslatePort) return;
   EST.attachTranslatePort(port, {
     translate: translatePayload,
     keepAlive: keepWorkerAlive
