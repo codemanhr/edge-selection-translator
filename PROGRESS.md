@@ -174,3 +174,5 @@ Checks:
 
 - `npm test` — 43 passed, 0 failed, including `tests/shortcuts.test.js`: Windows chords, macOS symbols, platform detection, and a settings round-trip that keeps `mac` when another field is saved
 - Manifest suggested keys remain `Alt+T` and `Alt+Shift+T`
+
+README was rewritten for readers and store submitters: install steps stay separate from `npm test` / `npm run pack`, and the screenshot section is the three images plus one note to replace them with Edge captures before submission.

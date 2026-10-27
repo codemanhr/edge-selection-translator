@@ -1,138 +1,107 @@
 # 划词翻译
 
-选中网页文字，在光标旁显示翻译。适用于 Microsoft Edge（Chromium）与其他 Chromium 浏览器。Manifest V3，无需构建步骤。
+在网页上选中文字，译文出现在光标旁边。用于 Microsoft Edge，Chrome 也可以加载。
 
 [English](#english) · [隐私政策](privacy-policy.md) · [商店文案](STORE_LISTING.md)
 
-## 安装（加载解压缩的扩展）
+## 安装
 
-1. 克隆本仓库，或下载 ZIP 后解压。安装时选择**仓库根目录**（里面有 `manifest.json`），不要选 `src`。
-2. 打开 Edge，地址栏输入 `edge://extensions`。
-3. 打开左侧或页面上的「开发人员模式」。
-4. 选择「加载解压缩的扩展」，指向本仓库根目录。
-5. 固定工具栏上的「划词翻译」图标。在任意 http 或 https 页面用鼠标选中文字，面板会出现在光标旁。
+1. 克隆仓库，或下载 ZIP 后解压。
+2. 打开 `edge://extensions`，打开「开发人员模式」。
+3. 选「加载解压缩的扩展」，指向含有 `manifest.json` 的目录（仓库根目录，不是 `src`）。
+4. 在网页上选中文字即可。建议把工具栏上的「划词翻译」固定出来。
 
-Chrome 的步骤相同，地址是 `chrome://extensions`。
+Chrome 用 `chrome://extensions`，其余相同。
 
-开发检查：
-
-```bash
-npm test
-npm run smoke:inject
-npm run smoke:e2e
-npm run pack
-```
-
-`npm test` 不需要安装依赖。`pack` 会在 `dist/edge-selection-translator.zip` 生成只含 `manifest.json`、`icons/` 和 `src/` 的商店包。
+点面板外面、按 Esc 或滚动页面，面板会关掉。
 
 ## 功能
 
-- 鼠标选中文字后，在光标旁显示译文。面板顶部选择目标语言。点击面板外部、按 Esc 或滚动页面即可关闭。
-- 自动检测源语言，一键对调语言。源语言和目标语言相同时，会在中文和英文之间改译。
-- 复制译文。用 Web Speech API 朗读原文或译文。
-- 快捷键：`Alt+T` 强制翻译当前选区，`Alt+Shift+T` 开启或关闭划词翻译。可在 `edge://extensions/shortcuts` 里修改。选项页和工具栏弹窗里的「快捷键显示系统」只改变界面写法：Windows / Linux 显示 `Alt+T`，macOS 显示 `⌥T` 与 `⌥⇧T`。浏览器登记的按键仍是 Alt，在 Mac 上对应 Option。第一次打开设置时会按系统自动选择，之后以你的选择为准。
-- 工具栏弹出页和选项页可改开关、语言、引擎、语气、主题和密钥。
-- 最近翻译（约 50 条）和收藏（约 100 条）保存在本机。
-- 按网站停用。`pre`、`code`、`kbd`、`samp` 以及 Monaco、CodeMirror、Ace、highlight.js、Shiki 等代码表面里的选区不翻译。密码框不读取。
-- 引擎：
-  - **Bing 翻译**（默认，免密钥）。读取 `www.bing.com/translator` 页面里的短期令牌，再请求 `ttranslatev3`。这是公开页面接口，不是稳定的官方 SLA。`https://edge.microsoft.com/translate/auth` 目前返回 404，所以没有使用。无头浏览器的 User-Agent 可能被拒绝，真实的 Edge 窗口可以正常取得令牌。
-  - **Google 翻译**（免密钥回退）。非官方 `translate.googleapis.com` `client=gtx` 接口，可能限流或下线。
-  - **MyMemory**（免密钥回退）。匿名配额较小，长文本按大约 450 字分段。
-  - **DeepL**、**OpenAI 兼容接口**、**LibreTranslate**、**Azure 翻译**。密钥写在选项页，只存在 `chrome.storage.local`。保存时会请求可选主机权限。未填密钥或请求失败时，回退到免密钥引擎，并在面板说明。LibreTranslate 公共实例通常要求密钥。
-- 语气：普通、更口语、更正式。DeepL 使用 `formality`，OpenAI 兼容接口写进系统提示。其他引擎仍按普通风格翻译，并提示不支持语气。
-- 可选：尽量不翻译网址、邮箱、全大写缩写和连续的英文专名。这是本地启发式规则，不是语法分析。
-- 外观跟随系统深色模式，也可在选项里固定浅色或深色。面板半透明。
+- 面板顶部选目标语言。会判断原文语言，也可以一键对调。原文和目标相同时，在中文和英文之间切换。
+- 复制译文，或朗读原文和译文。
+- `Alt+T` 强制翻译当前选区，`Alt+Shift+T` 打开或关闭划词翻译。实际按键在 `edge://extensions/shortcuts` 里改。选项页和工具栏弹窗的「快捷键显示系统」只改标签：Windows / Linux 为 `Alt+T`，macOS 为 `⌥T`、`⌥⇧T`。Edge 登记的命令仍是 Alt，在 Mac 上对应 Option。第一次打开设置时按系统选择，之后记住你的选择。
+- 工具栏弹窗和选项页可改开关、语言、引擎、语气、深浅色和密钥。
+- 最近约 50 条翻译、约 100 条收藏，存在本机。
+- 可以按网站停用。`pre`、`code` 以及常见代码编辑器里的选区不翻译，密码框也不读取。
+- 默认引擎是 Bing，不用密钥。不可用时改用 Google 或 MyMemory，面板会写明当前用的是哪一个。这几个免密钥接口是公开服务，可能会调整或限流。DeepL、OpenAI 兼容接口、LibreTranslate、Azure 在选项页填写密钥，密钥只保存在本机；没填或失败时退回免密钥引擎。
+- 语气可选普通、更口语或更正式。DeepL 和 OpenAI 兼容接口会照此翻译，其他引擎会说明仍按普通风格。
+- 可选：网址、邮箱、全大写缩写和连续的英文专名保持原文。
+- 面板跟随系统深色或浅色，也可以在选项里固定。
 
 ## 权限说明
 
 | 权限 | 原因 |
 | --- | --- |
-| `storage` | 在本机保存设置、历史、收藏、黑名单和 API 密钥。不使用同步存储。 |
-| `contextMenus` | 右键「翻译选中文字」，以及按当前网站停用或恢复。 |
-| `https://www.bing.com/*` | 默认引擎。选中的文字会发送到 Microsoft 的 Bing 翻译页面接口。 |
-| `https://translate.googleapis.com/*` | 免密钥回退。选中的文字会发送到 Google。 |
-| `https://api.mymemory.translated.net/*` | 免密钥回退。选中的文字会发送到 Translated（MyMemory）。 |
-| 可选 `https://*/*`，以及 `http://localhost/*`、`http://127.0.0.1/*` | 仅当你在选项页保存 DeepL、OpenAI 兼容接口、LibreTranslate 或 Azure 时，由你确认后授予，用来访问该引擎。 |
-| 内容脚本匹配 `http://*/*`、`https://*/*` | 读取你选中的文字并挂上隔离样式的面板。不使用 `activeTab` 或 `scripting`。 |
+| `storage` | 在本机保存设置、历史、收藏、黑名单和 API 密钥 |
+| `contextMenus` | 右键翻译选区，以及按网站停用或恢复 |
+| `https://www.bing.com/*` | 把选中文字发给 Bing 翻译 |
+| `https://translate.googleapis.com/*` | 免密钥回退，发给 Google |
+| `https://api.mymemory.translated.net/*` | 免密钥回退，发给 MyMemory |
+| 可选 `https://*/*`、`http://localhost/*`、`http://127.0.0.1/*` | 仅在选项页保存 DeepL、OpenAI 兼容接口、LibreTranslate 或 Azure 时，由你确认后访问该地址 |
+| 内容脚本 `http://*/*`、`https://*/*` | 在网页上读取选区并显示面板 |
 
-没有作者一方的服务器，没有远程代码，没有遥测。详见 [privacy-policy.md](privacy-policy.md)。
+扩展没有自己的服务器，不加载远程代码，也不做遥测。说明见 [privacy-policy.md](privacy-policy.md)。
 
 ## 发布到 Microsoft Edge 加载项
 
-清单依据：[Publish a Microsoft Edge extension](https://learn.microsoft.com/microsoft-edge/extensions/publish/publish-extension)。需要你自己的合作伙伴中心账号。
+需要 [Partner Center](https://partner.microsoft.com/dashboard/microsoftedge/overview) 账号。步骤对照 [微软的发布说明](https://learn.microsoft.com/microsoft-edge/extensions/publish/publish-extension)。
 
-1. 在 [Partner Center](https://partner.microsoft.com/dashboard/microsoftedge/overview) 注册开发人员账号并加入 Microsoft Edge 计划，接受开发者协议。
-2. 在本仓库运行 `npm test` 和 `npm run pack`。上传 `dist/edge-selection-translator.zip`。包内根目录必须有 `manifest.json`。不要把 `tests/`、`.git/` 打进去。
-3. 新建扩展，上传该 ZIP。若校验失败，按页面提示改清单后重新打包上传。
-4. 填写可用性：公开，以及你要上架的市场。本扩展不含成人内容。
-5. 属性：分类选 **Productivity**。网站可填本仓库地址。支持联系可用 GitHub Issues。
-6. 隐私：单一用途写「在用户选中网页文字时，于光标旁显示译文」。按上一节逐项填写权限理由。远程代码选 **否**。数据使用按 [STORE_LISTING.md](STORE_LISTING.md) 的披露勾选：处理选中的文本，发送到用户所选翻译服务，不出售，默认无遥测。隐私政策 URL 使用 GitHub Pages：仓库 Settings → Pages → 分支 `main`、目录 `/docs`，然后填写 `https://codemanhr.github.io/edge-selection-translator/privacy-policy.html`。Pages 生效前不要提交审核。
-7. 商店详情：名称为「划词翻译」。长描述从 [STORE_LISTING.md](STORE_LISTING.md) 复制，zh-CN 与 en 各一份，每份至少 250 个字符。简短描述来自清单 `description`，要改就改清单并重新上传包。徽标至少 128×128，建议 300×300，可用 `icons/icon128.png` 放大或另做。截图可选，最多 6 张，尺寸只能是 640×480 或 1280×800。
-8. 在提交页写下测试步骤：打开一篇 https 文章，选中一句英文，确认面板出现译文；在代码块里选中，确认不出现面板。DeepL 等引擎需要审核员自己的密钥。然后发布。认证可能需要若干个工作日。
+1. 注册并加入 Microsoft Edge 计划，接受开发者协议。
+2. 按文末「开发」打包，上传 `dist/edge-selection-translator.zip`。
+3. 新建扩展并上传。校验失败时按页面提示改清单，重新打包再传。
+4. 可用性选公开和要上架的市场。不含成人内容。
+5. 分类选 **Productivity**。网站填本仓库，支持联系可用 GitHub Issues。
+6. 隐私：单一用途写「在用户选中网页文字时，于光标旁显示译文」。权限理由按上一节填写。远程代码选否。数据使用与 [STORE_LISTING.md](STORE_LISTING.md) 一致：处理选中的文本，发给所选翻译服务，不出售，无遥测。隐私政策要先在 GitHub Pages 发布（`main` 分支的 `/docs`），地址为 `https://codemanhr.github.io/edge-selection-translator/privacy-policy.html`。页面打不开就先不要提交。
+7. 商店名称用「划词翻译」，须与清单一致。长描述从 [STORE_LISTING.md](STORE_LISTING.md) 复制，中英文各一份（250–10,000 个字符）。简短描述来自清单里的 `description`，要改就改清单后重新上传包。徽标至少 128×128，建议 300×300。截图最多 6 张，尺寸只能是 640×480 或 1280×800。
+8. 认证备注写清怎么试：打开 https 页面选中一句英文，应出现译文；在代码块里选中，不应出现面板。DeepL 等引擎需要审核员自己的密钥。提交后通常要几个工作日。
 
 ## 截图
 
+选中文字后的面板：
+
 ![选中文字后的翻译面板](docs/screenshots/panel.png)
+
+选项页：
 
 ![选项页](docs/screenshots/options.png)
 
+工具栏弹窗：
+
 ![工具栏弹出页](docs/screenshots/popup.png)
 
-## 许可
-
-[MIT](LICENSE) © 2026 codemanhr
+上架前请在 Edge 里重新截图，替换 `docs/screenshots/` 中的文件。
 
 ## English
 
-Select text and a compact translation panel appears beside the cursor. The package is a Manifest V3 extension for Microsoft Edge and other Chromium browsers. Load the repository root. There is no build step.
+Select text and the translation shows up beside the cursor.
 
-### Install (Load unpacked)
+### Install
 
-1. Clone this repository, or unzip a source archive. Choose the folder that contains `manifest.json`.
-2. Open `edge://extensions`.
-3. Turn on Developer mode.
-4. Choose Load unpacked and select this folder.
-5. Pin 划词翻译. Select text on an http or https page.
-
-`npm test` runs the unit checks with Node only. `npm run pack` writes `dist/edge-selection-translator.zip` containing `manifest.json`, `icons/`, and `src/`.
+Open `edge://extensions`, turn on Developer mode, and choose Load unpacked. Pick the folder that contains `manifest.json`. On Chrome the page is `chrome://extensions`.
 
 ### Features
 
-- A shadow-DOM panel opens next to the selection, with the target language at the top. Outside click, Esc, and page scroll dismiss it.
-- Local source-language detection and a one-click language swap. A same-language pair flips between Chinese and English.
-- Copy, and speak the original or the translation with the Web Speech API.
-- `Alt+T` force-translates. `Alt+Shift+T` toggles the feature. Change the keys at `edge://extensions/shortcuts`. The options page and toolbar popup have a Shortcut display control. It only changes labels (`Alt+T` on Windows/Linux, `⌥T` and `⌥⇧T` on macOS). The registered command stays Alt, which Edge maps to Option on a Mac. The first time settings load, the label style follows the system; your choice is then stored locally.
-- Popup and options page for the switch, languages, engine, tone, theme, and keys.
-- Local history (about 50) and favorites (about 100).
-- Per-site blacklist. Selections in `pre`, `code`, `kbd`, `samp`, and common editor surfaces are skipped. Password fields are ignored.
-- Engines: keyless Bing (default; public page token, not an SLA; `edge.microsoft.com/translate/auth` currently returns 404), keyless unofficial Google, keyless MyMemory, plus optional DeepL, OpenAI-compatible, LibreTranslate, and Azure keys stored only in `chrome.storage.local`. A missing key or a failed request falls back to a free engine. Tone (neutral, colloquial, formal) is applied by DeepL and OpenAI-compatible endpoints. Other engines say the tone was not applied. Proper-noun shielding is a local heuristic for URLs, emails, acronyms, and multi-word title-case names.
-- The panel follows `prefers-color-scheme` unless you pin light or dark.
+Target language sits at the top of the panel. Source language is detected, and the pair can be swapped. Copy or speak the result. `Alt+T` translates the selection even when the feature is off; `Alt+Shift+T` toggles it. In options and the toolbar popup, Shortcut display only changes the labels (`Alt+T` or macOS `⌥T` / `⌥⇧T`). The registered command stays Alt, which is Option on a Mac.
 
-### Permissions
+Bing is the default and needs no key. Google and MyMemory are the fallbacks. These free endpoints are public and may change or rate-limit. DeepL, OpenAI-compatible APIs, LibreTranslate, and Azure use a key stored on the device. Tone (neutral, colloquial, formal) is applied by DeepL and OpenAI-compatible APIs. History, favorites, a per-site block list, and skipping code and password fields are included. The panel follows the system theme.
 
-`storage` keeps settings, history, favorites, the blacklist, and API keys on the device. `contextMenus` adds translate and per-site pause. The three required host permissions send the selection to Bing, Google, or MyMemory. Optional host permissions are requested from the options page only when you save a keyed engine, including localhost for a self-hosted LibreTranslate. Content scripts match `http://*/*` and `https://*/*` so the panel can attach to the page. The extension does not request `activeTab` or `scripting`. There is no author server, no remote code, and no telemetry. See [privacy-policy.md](privacy-policy.md).
+Permissions are in the table above. Nothing is sent to the author. See [privacy-policy.md](privacy-policy.md).
 
-### Publish to Microsoft Edge Add-ons
+### Publish
 
-You need a Partner Center account. Checklist, following [the Edge publish guide](https://learn.microsoft.com/microsoft-edge/extensions/publish/publish-extension):
+Use a [Partner Center](https://partner.microsoft.com/dashboard/microsoftedge/overview) account and the checklist above. Upload `dist/edge-selection-translator.zip`. Category: Productivity. After GitHub Pages is enabled for `/docs` on `main`, the privacy policy URL is `https://codemanhr.github.io/edge-selection-translator/privacy-policy.html`. Listing text is in [STORE_LISTING.md](STORE_LISTING.md). Screenshots are in the section above.
 
-1. Enroll at Partner Center and accept the developer agreement.
-2. Run `npm test` and `npm run pack`. Upload `dist/edge-selection-translator.zip`.
-3. Create the extension and fix any package validation errors.
-4. Set availability and markets. There is no mature content.
-5. Category: Productivity. Website: this repository. Support: the GitHub Issues URL.
-6. Privacy: single purpose is translating the text the user selects. Justify `storage`, `contextMenus`, and the host permissions as in the table above. Remote code: No. Disclose that selected text is sent to the chosen engine, keys and history stay local, data is not sold, and telemetry is none. Publish GitHub Pages from the `main` branch `/docs` folder and use `https://codemanhr.github.io/edge-selection-translator/privacy-policy.html`.
-7. Store listing name is 划词翻译, matching the manifest. Paste the zh-CN and English descriptions from [STORE_LISTING.md](STORE_LISTING.md) (250–10,000 characters). The short description is the manifest `description`; change the manifest and re-upload to edit it. Logo at least 128×128, preferably 300×300. Screenshots, if you add them, must be 640×480 or 1280×800, up to six.
-8. Certification notes: select an English sentence on an https page and expect a translation; select inside a code block and expect no panel. Keyed engines need the reviewer’s own key. Submit. Certification can take several business days.
+## 开发
 
-### Screenshots
+直接加载仓库根目录，不用构建。需要 Node.js 18 或更高版本。
 
-![Selection panel](docs/screenshots/panel.png)
+```bash
+npm test
+npm run pack
+```
 
-![Options](docs/screenshots/options.png)
+`npm test` 不安装依赖。`npm run pack` 生成 `dist/edge-selection-translator.zip`，里面只有 `manifest.json`、`icons/` 和 `src/`。
 
-![Toolbar popup](docs/screenshots/popup.png)
-
-### License
+## 许可
 
 [MIT](LICENSE) © 2026 codemanhr
