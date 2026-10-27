@@ -52,7 +52,12 @@
     return !!(root && root.host && root.host.id === (ESTNS.HOST_ID || 'est-selection-translator-host'));
   }
 
+  function stopSpeaking() {
+    if (ESTNS.stopSpeech) ESTNS.stopSpeech({ synth: window.speechSynthesis });
+  }
+
   function showMessage(anchor, original, status) {
+    stopSpeaking();
     controller.open({
       x: anchor.x,
       y: anchor.y,
@@ -64,6 +69,7 @@
   }
 
   function requestTranslation(text, point) {
+    stopSpeaking();
     const seq = ++requestSeq;
     const choice = controller.getChoice();
     const flags = settingsSnapshot();
@@ -242,6 +248,9 @@
       }
       const text = controller.getText();
       if (text) requestTranslation(text, lastPointer);
+    },
+    onClose: function () {
+      stopSpeaking();
     },
     onFavorite: function () {
       const text = controller.getText();

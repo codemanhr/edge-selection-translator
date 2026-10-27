@@ -85,6 +85,8 @@ test('speech builds a BCP-47 utterance and speaks through the provided synth', f
   assert.equal(cancelled, 1);
   assert.equal(spoken[0].text, 'Hello');
   assert.equal(spoken[0].lang, 'en-US');
+  assert.equal(spoken[0].rate, 1);
+  assert.equal(spoken[0].pitch, 1);
   assert.equal(speakText('Hello', 'en', {}).reason, 'unsupported');
   assert.equal(speakText('  ', 'en', {}).reason, 'empty');
 });
