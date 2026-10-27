@@ -131,16 +131,36 @@
     requestTranslation(decision.text, anchor);
   }
 
+  function persistChoice(choice) {
+    globalThis.__EST_SETTINGS__ = Object.assign({}, globalThis.__EST_SETTINGS__ || {}, {
+      sourceLang: choice.source,
+      targetLang: choice.target
+    });
+    if (chrome.storage && chrome.storage.local && ESTNS.saveSettings) {
+      ESTNS.saveSettings(chrome.storage.local, {
+        sourceLang: choice.source,
+        targetLang: choice.target
+      }).catch(function () {});
+    }
+  }
+
+  function speak(text, lang) {
+    const result = ESTNS.speakText(text, lang, {
+      synth: window.speechSynthesis,
+      Utterance: window.SpeechSynthesisUtterance
+    });
+    if (!result.ok) {
+      controller.setStatus(result.reason === 'empty' ? '没有可朗读的文本' : '当前环境不支持朗读');
+    }
+    return result;
+  }
+
   controller.setHandlers({
     onLanguageChange: function () {
       const text = controller.getText();
-      if (!text) return;
       const choice = controller.getChoice();
-      globalThis.__EST_SETTINGS__ = Object.assign({}, globalThis.__EST_SETTINGS__ || {}, {
-        sourceLang: choice.source,
-        targetLang: choice.target
-      });
-      requestTranslation(text, lastPointer);
+      persistChoice(choice);
+      if (text) requestTranslation(text, lastPointer);
     },
     onSwap: function () {
       const choice = controller.getChoice();
@@ -151,10 +171,49 @@
         detected: detected
       });
       controller.setChoice(next.source, next.target);
-      globalThis.__EST_SETTINGS__ = Object.assign({}, globalThis.__EST_SETTINGS__ || {}, next);
+      persistChoice(next);
       const text = controller.getText();
       if (text) requestTranslation(text, lastPointer);
+    },
+    onCopy: function () {
+      const text = controller.getTranslation();
+      ESTNS.copyText(text, { clipboard: navigator.clipboard, doc: doc }).then(function (result) {
+        if (!controller.isOpen()) return;
+        if (result.reason === 'empty') controller.setStatus('还没有译文');
+        else controller.setStatus(result.ok ? '已复制译文' : '复制失败');
+      });
+    },
+    onSpeakOriginal: function () {
+      const choice = controller.getChoice();
+      const lang = choice.source === 'auto' ? (controller.getDetected() || 'en') : choice.source;
+      speak(controller.getText(), lang);
+    },
+    onSpeakTranslation: function () {
+      speak(controller.getTranslation(), controller.getChoice().target);
     }
+  });
+
+  function applySettings(settings) {
+    globalThis.__EST_SETTINGS__ = settings;
+    controller.setChoice(settings.sourceLang, settings.targetLang);
+  }
+
+  if (chrome.storage && chrome.storage.local && ESTNS.mergeSettings) {
+    const key = ESTNS.STORAGE_KEY || 'estSettings';
+    chrome.storage.local.get(key, function (data) {
+      if (chrome.runtime.lastError) return;
+      applySettings(ESTNS.mergeSettings(data && data[key]));
+    });
+    chrome.storage.onChanged.addListener(function (changes, area) {
+      if (area !== 'local' || !changes[key]) return;
+      applySettings(ESTNS.mergeSettings(changes[key].newValue));
+    });
+  }
+
+  chrome.runtime.onMessage.addListener(function (message) {
+    if (!message) return undefined;
+    if (message.type === 'force-translate') globalThis.__EST_FORCE_TRANSLATE__();
+    return undefined;
   });
 
   doc.addEventListener('mousemove', function (event) {

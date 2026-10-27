@@ -186,5 +186,5 @@ test('manifest allows only the free translation hosts and loads language libs fi
   assert.ok(scripts.indexOf('src/lib/direction.js') < scripts.indexOf('src/content/content.js'));
   const worker = fs.readFileSync(path.join(__dirname, '..', 'src/background/service-worker.js'), 'utf8');
   assert.match(worker, /importScripts\([\s\S]*router\.js/);
-  assert.match(worker, /type !== 'translate'/);
+  assert.match(worker, /message\.type === 'translate'/);
 });

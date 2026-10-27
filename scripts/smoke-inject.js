@@ -251,7 +251,15 @@ async function main() {
     if (ws && ws.readyState === WebSocket.OPEN) ws.close();
     child.kill('SIGKILL');
     server.close();
-    fs.rmSync(profile, { recursive: true, force: true });
+    await sleep(250);
+    for (let attempt = 0; attempt < 6; attempt += 1) {
+      try {
+        fs.rmSync(profile, { recursive: true, force: true });
+        break;
+      } catch (err) {
+        await sleep(150);
+      }
+    }
   }
 }
 

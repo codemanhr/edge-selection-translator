@@ -7,7 +7,7 @@ Later stages are not started until the previous stage is green.
 | --- | --- | --- |
 | A. MV3 scaffold | PASS | 2026-10-27 |
 | B. Translation pipeline | PASS | 2026-10-27 |
-| C. Copy, TTS, shortcuts, options | pending | |
+| C. Copy, TTS, shortcuts, options | PASS | 2026-10-27 |
 | D. History, favorites, blacklist, code skip | pending | |
 | E. Engines, style, dark UI | pending | |
 | F. Store docs and hygiene | pending | |
@@ -62,3 +62,26 @@ Checks:
   - A normal Edge window sends a browser user agent, which is the path the Node smoke used successfully for Bing
 
 Not in this stage: copy, speech, shortcuts, options page.
+
+## Stage C — Copy, speech, shortcuts, options
+
+Status: PASS (2026-10-27)
+
+What shipped:
+
+- Copy translation (Clipboard API, then a textarea fallback) and Web Speech buttons for the original and the translation
+- Commands: `Alt+T` force-translate, `Alt+Shift+T` global enable toggle. Descriptions match `src/lib/commands.js`
+- Toolbar popup and options page. Both read and write `chrome.storage.local` under `estSettings` (enabled, languages, free engine). API keys stay in that same local object and are not synced by the extension
+- Disabled state shows an `OFF` badge. Language changes in the panel are saved
+
+Checks:
+
+- `npm test` — 30 passed, 0 failed
+  - settings round-trip (turning translation off does not wipe the target language or a stored key)
+  - clipboard success and fallback
+  - utterance language mapping and a fake speech synth
+  - manifest command names, suggested keys, and descriptions match the catalog
+  - popup and options reference `loadSettings` / `saveSettings` and do not load remote scripts
+- `npm run smoke:e2e` — `SMOKE_E2E_OK` (panel still translates after the new buttons and settings boot)
+
+Not in this stage: history, favorites, site blacklist, code-block skipping.

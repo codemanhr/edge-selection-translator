@@ -58,6 +58,11 @@
       '</div>',
       '<div class="meta" data-role="meta"></div>',
       '<div class="body" data-role="body"></div>',
+      '<div class="tools">',
+      '  <button type="button" data-role="copy">复制译文</button>',
+      '  <button type="button" data-role="speak-original">读原文</button>',
+      '  <button type="button" data-role="speak-translation">读译文</button>',
+      '</div>',
       '<div class="original" data-role="original"></div>',
       '<div class="status" data-role="status"></div>'
     ].join('');
@@ -72,6 +77,9 @@
     const metaEl = panel.querySelector('[data-role="meta"]');
     const closeBtn = panel.querySelector('[data-role="close"]');
     const swapBtn = panel.querySelector('[data-role="swap"]');
+    const copyBtn = panel.querySelector('[data-role="copy"]');
+    const speakOriginalBtn = panel.querySelector('[data-role="speak-original"]');
+    const speakTranslationBtn = panel.querySelector('[data-role="speak-translation"]');
 
     function fillSelect(select, includeAuto, selected) {
       select.textContent = '';
@@ -90,11 +98,16 @@
 
     let open = false;
     let currentText = '';
+    let translated = '';
+    let loading = false;
     let detected = '';
     let engineName = '';
     let handlers = {
       onLanguageChange: function () {},
-      onSwap: function () {}
+      onSwap: function () {},
+      onCopy: function () {},
+      onSpeakOriginal: function () {},
+      onSpeakTranslation: function () {}
     };
 
     function place(point) {
@@ -129,11 +142,14 @@
       if (options.sourceLang) sourceSelect.value = options.sourceLang;
       if (options.targetLang) targetSelect.value = options.targetLang;
       originalEl.textContent = currentText;
-      if (options.loading) {
+      loading = !!options.loading;
+      if (loading) {
+        translated = '';
         bodyEl.textContent = '正在翻译…';
         bodyEl.classList.add('loading');
       } else {
-        bodyEl.textContent = options.translated || '';
+        if (options.translated != null) translated = options.translated;
+        bodyEl.textContent = translated;
         bodyEl.classList.remove('loading');
       }
       statusEl.textContent = options.status || '';
@@ -149,6 +165,8 @@
     function closePanel() {
       open = false;
       currentText = '';
+      translated = '';
+      loading = false;
       detected = '';
       engineName = '';
       host.style.display = 'none';
@@ -175,6 +193,21 @@
     });
     targetSelect.addEventListener('change', function () { handlers.onLanguageChange(); });
     sourceSelect.addEventListener('change', function () { handlers.onLanguageChange(); });
+    copyBtn.addEventListener('click', function (event) {
+      event.preventDefault();
+      event.stopPropagation();
+      handlers.onCopy();
+    });
+    speakOriginalBtn.addEventListener('click', function (event) {
+      event.preventDefault();
+      event.stopPropagation();
+      handlers.onSpeakOriginal();
+    });
+    speakTranslationBtn.addEventListener('click', function (event) {
+      event.preventDefault();
+      event.stopPropagation();
+      handlers.onSpeakTranslation();
+    });
 
     (doc.documentElement || doc.body).appendChild(host);
 
@@ -185,7 +218,9 @@
       move: move,
       isOpen: function () { return open; },
       getText: function () { return currentText; },
+      getTranslation: function () { return loading ? '' : translated; },
       getDetected: function () { return detected; },
+      setStatus: function (text) { statusEl.textContent = text || ''; },
       getChoice: function () {
         return { source: sourceSelect.value || 'auto', target: targetSelect.value || 'zh-Hans' };
       },
@@ -195,10 +230,7 @@
         renderMeta();
       },
       setHandlers: function (next) {
-        handlers = {
-          onLanguageChange: (next && next.onLanguageChange) || function () {},
-          onSwap: (next && next.onSwap) || function () {}
-        };
+        handlers = Object.assign(handlers, next || {});
       },
       isEventInside: function (event) {
         if (!event) return false;

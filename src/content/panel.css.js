@@ -91,6 +91,17 @@ select {
   overflow: hidden;
   user-select: text;
 }
+.tools { display: flex; flex-wrap: wrap; gap: 4px; }
+.tools button {
+  appearance: none;
+  border: 1px solid var(--est-border);
+  background: rgba(255, 255, 255, 0.7);
+  border-radius: 7px;
+  padding: 2px 7px;
+  font-size: 11px;
+  cursor: pointer;
+}
+.tools button:hover { background: var(--est-soft); }
 .status { font-size: 11px; color: #8a4b08; }
 .status:empty { display: none; }
 `.trim();

@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>划词翻译设置</title>
+  <link rel="stylesheet" href="options.css">
+</head>
+<body>
+  <main>
+    <header>
+      <p class="mark">Edge</p>
+      <h1>划词翻译</h1>
+      <p class="sub">Selection Translator · 选中文字，在光标旁查看译文</p>
+    </header>
+
+    <section>
+      <h2>常规 <span>General</span></h2>
+      <label class="check">
+        <input id="enabled" type="checkbox">
+        <span>启用划词翻译<br><small>Enable translation when text is selected</small></span>
+      </label>
+    </section>
+
+    <section>
+      <h2>语言 <span>Languages</span></h2>
+      <div class="grid">
+        <label>源语言 Source
+          <select id="source"></select>
+        </label>
+        <label>目标语言 Target
+          <select id="target"></select>
+        </label>
+      </div>
+    </section>
+
+    <section>
+      <h2>引擎 <span>Engine</span></h2>
+      <label>翻译引擎
+        <select id="engine">
+          <option value="bing">Bing 翻译（免密钥，默认）</option>
+          <option value="google">Google 翻译（免密钥，非官方）</option>
+          <option value="mymemory">MyMemory（免密钥，有配额）</option>
+        </select>
+      </label>
+      <p class="hint" id="engine-hint"></p>
+    </section>
+
+    <section>
+      <h2>快捷键 <span>Shortcuts</span></h2>
+      <ul class="keys">
+        <li><kbd>Alt</kbd> + <kbd>T</kbd> 强制翻译当前选区，即使总开关关闭</li>
+        <li><kbd>Alt</kbd> + <kbd>Shift</kbd> + <kbd>T</kbd> 开启或关闭划词翻译</li>
+      </ul>
+      <p class="hint">组合键可在 edge://extensions/shortcuts 里修改。如果按键没有反应，多半是被浏览器占用了。</p>
+    </section>
+
+    <p class="saved" id="saved" hidden>已保存</p>
+  </main>
+  <script src="../lib/constants.js"></script>
+  <script src="../lib/languages.js"></script>
+  <script src="../lib/settings.js"></script>
+  <script src="../lib/commands.js"></script>
+  <script src="options.js"></script>
+</body>
+</html>
