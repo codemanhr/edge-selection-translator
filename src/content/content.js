@@ -77,22 +77,29 @@
       status: '',
       theme: flags.theme
     });
-    let pending;
+    const payload = {
+      type: 'translate',
+      text: text,
+      sourceLang: choice.source,
+      targetLang: choice.target,
+      engine: flags.engine,
+      style: style,
+      keepProperNouns: flags.keepProperNouns,
+      api: flags.api
+    };
+    let runtime = null;
+    let runtimeError = null;
     try {
-      pending = chrome.runtime.sendMessage({
-        type: 'translate',
-        text: text,
-        sourceLang: choice.source,
-        targetLang: choice.target,
-        engine: flags.engine,
-        style: style,
-        keepProperNouns: flags.keepProperNouns,
-        api: flags.api
-      });
+      runtime = typeof chrome !== 'undefined' ? chrome.runtime : null;
     } catch (err) {
-      pending = Promise.reject(err);
+      runtimeError = err;
     }
-    Promise.resolve(pending).then(function (response) {
+    if (runtimeError || !ESTNS.sendExtensionMessage) {
+      showMessage(point, text, backgroundStatus(runtimeError || new Error('无法连接扩展后台')));
+      return;
+    }
+    const pending = ESTNS.sendExtensionMessage(payload, runtime);
+    pending.then(function (response) {
       if (seq !== requestSeq || !controller.isOpen() || controller.getText() !== text) return;
       if (!response || !response.ok) {
         showMessage(point, text, (response && response.error) || '翻译失败');
@@ -111,10 +118,15 @@
       });
       rememberTranslation(text, response);
       refreshFavorite(text, response.targetLang);
-    }).catch(function () {
+    }).catch(function (err) {
       if (seq !== requestSeq || !controller.isOpen()) return;
-      showMessage(point, text, '无法连接扩展后台');
+      showMessage(point, text, backgroundStatus(err));
     });
+  }
+
+  function backgroundStatus(err) {
+    if (ESTNS.userFacingBackgroundError) return ESTNS.userFacingBackgroundError(err);
+    return (err && err.message) || '无法连接扩展后台';
   }
 
   function handleSelection(point, force) {
@@ -287,6 +299,7 @@
 
   chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
     if (!message) return undefined;
+    if (message.type === 'translate' || message.type === 'est-ping') return undefined;
     if (message.type === 'force-translate') {
       globalThis.__EST_FORCE_TRANSLATE__();
       return undefined;
@@ -299,7 +312,7 @@
           ? ESTNS.isBlacklisted(cached.blacklist || [], location.hostname)
           : false
       });
-      return true;
+      return undefined;
     }
     if (message.type === 'toggle-blacklist') {
       ESTNS.loadSettings(chrome.storage.local).then(function (settings) {

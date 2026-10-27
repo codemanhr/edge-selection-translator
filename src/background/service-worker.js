@@ -15,6 +15,7 @@ importScripts(
 );
 
 const authCache = EST.createAuthCache();
+console.log('est: worker start');
 
 async function refreshBadge() {
   const settings = await EST.loadSettings(chrome.storage.local);
@@ -44,20 +45,43 @@ chrome.runtime.onInstalled.addListener(function () {
 });
 chrome.runtime.onStartup.addListener(function () { refreshBadge(); });
 
+function keepWorkerAlive() {
+  try { chrome.runtime.getPlatformInfo(function () {}); } catch (err) {}
+  const timer = setInterval(function () {
+    try { chrome.runtime.getPlatformInfo(function () {}); } catch (err) {}
+  }, 400);
+  return function () { clearInterval(timer); };
+}
+
 chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
   if (!message || !message.type) return undefined;
+  if (message.type === 'est-ping' || message.type === 'translate') {
+    console.log('est: ' + message.type);
+  }
+  if (message.type === 'est-ping') {
+    sendResponse({ ok: true });
+    return undefined;
+  }
   if (message.type === 'translate') {
+    const stop = keepWorkerAlive();
     EST.translateText({
       text: message.text,
       sourceLang: message.sourceLang,
       targetLang: message.targetLang,
-      engine: message.engine
+      engine: message.engine,
+      style: message.style,
+      keepProperNouns: message.keepProperNouns,
+      api: message.api
     }, {
       fetch: fetch,
       authCache: authCache,
       now: function () { return Date.now(); }
-    }).then(sendResponse, function (err) {
-      sendResponse({ ok: false, error: (err && err.message) || '翻译失败' });
+    }).then(function (response) {
+      stop();
+      try { sendResponse(response); } catch (err) {}
+    }, function (err) {
+      stop();
+      try { sendResponse({ ok: false, error: (err && err.message) || '翻译失败' }); } catch (e) {}
     });
     return true;
   }
