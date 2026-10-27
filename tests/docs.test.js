@@ -48,7 +48,8 @@ test('README is bilingual and the store listing matches the manifest', function 
   assert.match(readme, /加载解压缩的扩展/);
   assert.match(readme, /edge:\/\/extensions/);
   assert.equal(/Partner Center|发布到 Microsoft Edge/.test(readme), false);
-  assert.match(readme, /权限说明/);
+  assert.equal(/## 权限说明|Permissions are in the table/.test(readme), false);
+  assert.match(readme, /privacy-policy\.md/);
   assert.match(readme, /## English/);
   assert.match(readme, /Load unpacked/);
   assert.match(listing, /划词翻译/);

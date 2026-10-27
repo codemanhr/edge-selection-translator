@@ -28,20 +28,6 @@ Chrome 用 `chrome://extensions`，其余相同。
 - 可选：网址、邮箱、全大写缩写和连续的英文专名保持原文。
 - 面板跟随系统深色或浅色，也可以在选项里固定。
 
-## 权限说明
-
-| 权限 | 原因 |
-| --- | --- |
-| `storage` | 在本机保存设置、历史、收藏、黑名单和 API 密钥 |
-| `contextMenus` | 右键翻译选区，以及按网站停用或恢复 |
-| `https://www.bing.com/*` | 把选中文字发给 Bing 翻译 |
-| `https://translate.googleapis.com/*` | 免密钥回退，发给 Google |
-| `https://api.mymemory.translated.net/*` | 免密钥回退，发给 MyMemory |
-| 可选 `https://*/*`、`http://localhost/*`、`http://127.0.0.1/*` | 仅在选项页保存 DeepL、OpenAI 兼容接口、LibreTranslate 或 Azure 时，由你确认后访问该地址 |
-| 内容脚本 `http://*/*`、`https://*/*` | 在网页上读取选区并显示面板 |
-
-扩展没有自己的服务器，不加载远程代码，也不做遥测。说明见 [privacy-policy.md](privacy-policy.md)。
-
 ## English
 
 Select text and the translation shows up beside the cursor.
@@ -56,7 +42,7 @@ Target language sits at the top of the panel. Source language is detected, and t
 
 Bing is the default and needs no key. Google and MyMemory are the fallbacks. These free endpoints are public and may change or rate-limit. DeepL, OpenAI-compatible APIs, LibreTranslate, and Azure use a key stored on the device. Tone (neutral, colloquial, formal) is applied by DeepL and OpenAI-compatible APIs. History, favorites, a per-site block list, and skipping code and password fields are included. The panel follows the system theme.
 
-Permissions are in the table above. Nothing is sent to the author. See [privacy-policy.md](privacy-policy.md).
+See [privacy-policy.md](privacy-policy.md).
 
 ## 开发
 
