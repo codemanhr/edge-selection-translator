@@ -65,7 +65,10 @@ test('README is bilingual and the store listing matches the manifest', function 
 });
 
 test('icons are PNG at 16, 32, 48, and 128, and the pack zip is extension files only', function () {
-  [16, 32, 48, 128].forEach(function (size) {
+  const svg = fs.readFileSync(path.join(root, 'icons', 'icon.svg'), 'utf8');
+  assert.match(svg, /viewBox="0 0 128 128"/);
+  assert.match(svg, /#0F6CBD/);
+  [16, 32, 48, 128, 300].forEach(function (size) {
     const buf = fs.readFileSync(path.join(root, 'icons', 'icon' + size + '.png'));
     assert.equal(buf.subarray(0, 8).toString('hex'), '89504e470d0a1a0a');
     assert.equal(buf.readUInt32BE(16), size);

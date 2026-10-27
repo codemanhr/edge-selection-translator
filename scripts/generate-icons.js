@@ -1,8 +1,26 @@
 'use strict';
 
+/**
+ * Draws the extension icon from one vector description, then writes
+ * icons/icon.svg and a PNG at each target size. Every PNG is rasterized
+ * at that exact pixel size (4× supersampled), not scaled from a smaller file.
+ * The 16px toolbar icon uses the same colors with a pixel-aligned “A”,
+ * because a uniform scale of the 128px drawing closes the letter.
+ *
+ * Brand: blue rounded tile, white speech bubble, blue “A”, amber arrow.
+ */
+
 const fs = require('fs');
 const path = require('path');
 const zlib = require('zlib');
+
+const VIEW = 128;
+const BLUE = [15, 108, 189, 255];
+const WHITE = [255, 255, 255, 255];
+const INK = [11, 74, 130, 255];
+const AMBER = [255, 180, 64, 255];
+
+const SIZES = [16, 32, 48, 128, 300];
 
 function crc32(buf) {
   let c = ~0;
@@ -24,18 +42,225 @@ function chunk(type, data) {
   return Buffer.concat([length, typeAndData, crc]);
 }
 
-function encodePNG(size, pixelAt) {
+function hex(color) {
+  return '#' + color.slice(0, 3).map(function (n) {
+    return n.toString(16).padStart(2, '0');
+  }).join('').toUpperCase();
+}
+
+function thickSegment(x1, y1, x2, y2, width) {
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  const len = Math.hypot(dx, dy) || 1;
+  const nx = (-dy / len) * (width / 2);
+  const ny = (dx / len) * (width / 2);
+  return [
+    [x1 + nx, y1 + ny],
+    [x2 + nx, y2 + ny],
+    [x2 - nx, y2 - ny],
+    [x1 - nx, y1 - ny]
+  ];
+}
+
+function buildShapes() {
+  const shapes = [];
+  function add(shape) {
+    shapes.push(shape);
+  }
+
+  add({
+    type: 'roundRect',
+    x: 4, y: 4, w: 120, h: 120, r: 28,
+    fill: BLUE
+  });
+  add({ type: 'ellipse', cx: 54, cy: 56, rx: 36, ry: 30, fill: WHITE });
+  add({
+    type: 'polygon',
+    points: [[26, 78], [48, 68], [34, 106]],
+    fill: WHITE
+  });
+
+  const letter = 15;
+  [
+    [54, 32, 36, 80],
+    [54, 32, 72, 80],
+    [41, 62, 67, 62]
+  ].forEach(function (seg) {
+    add({
+      type: 'polygon',
+      points: thickSegment(seg[0], seg[1], seg[2], seg[3], letter),
+      fill: BLUE
+    });
+    add({ type: 'circle', cx: seg[0], cy: seg[1], r: letter / 2, fill: BLUE });
+    add({ type: 'circle', cx: seg[2], cy: seg[3], r: letter / 2, fill: BLUE });
+  });
+
+  add({ type: 'circle', cx: 98, cy: 96, r: 20, fill: AMBER });
+  add({
+    type: 'polygon',
+    points: [
+      [112, 96],
+      [100, 86],
+      [100, 92],
+      [84, 92],
+      [84, 100],
+      [100, 100],
+      [100, 106]
+    ],
+    fill: INK
+  });
+  return shapes;
+}
+
+// 16px toolbar slot. Same mark, but the tail is omitted and the strokes
+// are sized in a 16-unit grid so they stay a couple of pixels wide.
+function buildCompactShapes() {
+  const shapes = [];
+  function add(shape) {
+    shapes.push(shape);
+  }
+  function px(x, y, fill) {
+    add({ type: 'rect', x: x, y: y, w: 1, h: 1, fill: fill });
+  }
+  add({ type: 'roundRect', x: 0.5, y: 0.5, w: 15, h: 15, r: 3.4, fill: BLUE });
+  add({ type: 'ellipse', cx: 6.5, cy: 6.6, rx: 4.7, ry: 4.35, fill: WHITE });
+  // Pixel-aligned “A” so the 16px slot stays sharp.
+  px(6, 3, BLUE);
+  [5, 7].forEach(function (x) { px(x, 4, BLUE); });
+  [4, 8].forEach(function (x) { px(x, 5, BLUE); });
+  [4, 5, 6, 7, 8].forEach(function (x) { px(x, 6, BLUE); });
+  [4, 8].forEach(function (x) { px(x, 7, BLUE); });
+  [4, 8].forEach(function (x) { px(x, 8, BLUE); });
+  [4, 8].forEach(function (x) { px(x, 9, BLUE); });
+  add({ type: 'circle', cx: 12.35, cy: 12.35, r: 2.85, fill: AMBER });
+  add({
+    type: 'polygon',
+    points: [
+      [13.85, 12.35],
+      [11.35, 10.7],
+      [11.85, 12.35],
+      [11.35, 14.0]
+    ],
+    fill: INK
+  });
+  return shapes;
+}
+
+function pointsAttr(points) {
+  return points.map(function (p) {
+    return trim(p[0]) + ',' + trim(p[1]);
+  }).join(' ');
+}
+
+function trim(n) {
+  return String(Math.round(n * 100) / 100);
+}
+
+function toSvg(shapes) {
+  const body = shapes.map(function (shape) {
+    const fill = hex(shape.fill);
+    if (shape.type === 'roundRect') {
+      return '<rect x="' + shape.x + '" y="' + shape.y + '" width="' + shape.w + '" height="' + shape.h + '" rx="' + shape.r + '" fill="' + fill + '"/>';
+    }
+    if (shape.type === 'ellipse') {
+      return '<ellipse cx="' + shape.cx + '" cy="' + shape.cy + '" rx="' + shape.rx + '" ry="' + shape.ry + '" fill="' + fill + '"/>';
+    }
+    if (shape.type === 'circle') {
+      return '<circle cx="' + trim(shape.cx) + '" cy="' + trim(shape.cy) + '" r="' + trim(shape.r) + '" fill="' + fill + '"/>';
+    }
+    return '<polygon points="' + pointsAttr(shape.points) + '" fill="' + fill + '"/>';
+  }).join('\n  ');
+  return [
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + VIEW + ' ' + VIEW + '" width="' + VIEW + '" height="' + VIEW + '">',
+    '  ' + body,
+    '</svg>',
+    ''
+  ].join('\n');
+}
+
+function insideRoundRect(px, py, left, top, right, bottom, radius) {
+  if (px < left || py < top || px > right || py > bottom) return false;
+  const cx = px < left + radius ? left + radius : px > right - radius ? right - radius : px;
+  const cy = py < top + radius ? top + radius : py > bottom - radius ? bottom - radius : py;
+  const dx = px - cx;
+  const dy = py - cy;
+  return dx * dx + dy * dy <= radius * radius;
+}
+
+function insidePolygon(x, y, points) {
+  let inside = false;
+  for (let i = 0, j = points.length - 1; i < points.length; j = i, i += 1) {
+    const xi = points[i][0];
+    const yi = points[i][1];
+    const xj = points[j][0];
+    const yj = points[j][1];
+    const cross = (yi > y) !== (yj > y);
+    if (cross && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+}
+
+function hit(shape, x, y) {
+  if (shape.type === 'roundRect') {
+    return insideRoundRect(x, y, shape.x, shape.y, shape.x + shape.w, shape.y + shape.h, shape.r);
+  }
+  if (shape.type === 'ellipse') {
+    const dx = (x - shape.cx) / shape.rx;
+    const dy = (y - shape.cy) / shape.ry;
+    return dx * dx + dy * dy <= 1;
+  }
+  if (shape.type === 'circle') {
+    const dx = x - shape.cx;
+    const dy = y - shape.cy;
+    return dx * dx + dy * dy <= shape.r * shape.r;
+  }
+  if (shape.type === 'rect') {
+    return x >= shape.x && y >= shape.y && x < shape.x + shape.w && y < shape.y + shape.h;
+  }
+  return insidePolygon(x, y, shape.points);
+}
+
+function sample(shapes, x, y) {
+  let color = [0, 0, 0, 0];
+  for (let i = 0; i < shapes.length; i += 1) {
+    if (hit(shapes[i], x, y)) color = shapes[i].fill;
+  }
+  return color;
+}
+
+function encodePNG(size, shapes, view) {
+  const samples = 4;
   const stride = size * 4 + 1;
   const raw = Buffer.alloc(stride * size);
+  const scale = view / size;
   for (let y = 0; y < size; y += 1) {
     raw[y * stride] = 0;
     for (let x = 0; x < size; x += 1) {
-      const [r, g, b, a] = pixelAt(x, y, size);
+      let r = 0;
+      let g = 0;
+      let b = 0;
+      let a = 0;
+      for (let sy = 0; sy < samples; sy += 1) {
+        for (let sx = 0; sx < samples; sx += 1) {
+          const gx = (x + (sx + 0.5) / samples) * scale;
+          const gy = (y + (sy + 0.5) / samples) * scale;
+          const color = sample(shapes, gx, gy);
+          const ca = color[3] / 255;
+          r += color[0] * ca;
+          g += color[1] * ca;
+          b += color[2] * ca;
+          a += ca;
+        }
+      }
+      const count = samples * samples;
+      const alpha = a / count;
       const i = y * stride + 1 + x * 4;
-      raw[i] = r;
-      raw[i + 1] = g;
-      raw[i + 2] = b;
-      raw[i + 3] = a;
+      if (alpha > 0) {
+        raw[i] = Math.round(r / a);
+        raw[i + 1] = Math.round(g / a);
+        raw[i + 2] = Math.round(b / a);
+      }
+      raw[i + 3] = Math.round(alpha * 255);
     }
   }
   const ihdr = Buffer.alloc(13);
@@ -52,65 +277,18 @@ function encodePNG(size, pixelAt) {
   ]);
 }
 
-function insideRoundRect(px, py, left, top, right, bottom, radius) {
-  if (px < left || px > right || py < top || py > bottom) return false;
-  const cx = px < left + radius ? left + radius : px > right - radius ? right - radius : px;
-  const cy = py < top + radius ? top + radius : py > bottom - radius ? bottom - radius : py;
-  if (cx === px && cy === py) return true;
-  const dx = px - cx;
-  const dy = py - cy;
-  return dx * dx + dy * dy <= radius * radius;
-}
-
-function distToSegment(px, py, x1, y1, x2, y2) {
-  const dx = x2 - x1;
-  const dy = y2 - y1;
-  const len = dx * dx + dy * dy;
-  if (len === 0) return Math.hypot(px - x1, py - y1);
-  let t = ((px - x1) * dx + (py - y1) * dy) / len;
-  t = Math.max(0, Math.min(1, t));
-  return Math.hypot(px - (x1 + t * dx), py - (y1 + t * dy));
-}
-
-function iconPixel(x, y, size) {
-  const px = (x + 0.5) / size;
-  const py = (y + 0.5) / size;
-  const blue = [15, 108, 189, 255];
-  const white = [255, 255, 255, 255];
-  const ink = [11, 74, 130, 255];
-  const amber = [255, 180, 64, 255];
-  if (!insideRoundRect(px, py, 0.04, 0.04, 0.96, 0.96, 0.22)) return [0, 0, 0, 0];
-
-  const inBubble =
-    ((px - 0.46) ** 2) / (0.30 ** 2) + ((py - 0.44) ** 2) / (0.26 ** 2) <= 1;
-  const inTail =
-    px >= 0.28 && px <= 0.46 && py >= 0.58 && py <= 0.74 &&
-    (py - 0.58) <= (0.46 - px) * 1.15;
-
-  const stroke = Math.max(0.055, 1.35 / size);
-  const leftLeg = distToSegment(px, py, 0.38, 0.60, 0.48, 0.30) <= stroke;
-  const rightLeg = distToSegment(px, py, 0.58, 0.60, 0.48, 0.30) <= stroke;
-  const crossbar = distToSegment(px, py, 0.41, 0.50, 0.55, 0.50) <= stroke * 0.85;
-  const letter = leftLeg || rightLeg || crossbar;
-
-  const dot = ((px - 0.74) ** 2) + ((py - 0.70) ** 2) <= (0.11 ** 2);
-  const arrow =
-    distToSegment(px, py, 0.68, 0.70, 0.80, 0.70) <= Math.max(0.03, 0.9 / size) ||
-    distToSegment(px, py, 0.75, 0.64, 0.81, 0.70) <= Math.max(0.03, 0.9 / size) ||
-    distToSegment(px, py, 0.75, 0.76, 0.81, 0.70) <= Math.max(0.03, 0.9 / size);
-
-  if (dot) return arrow ? ink : amber;
-  if (inBubble || inTail) return letter ? blue : white;
-  return blue;
-}
-
 function main() {
   const dir = path.join(__dirname, '..', 'icons');
   fs.mkdirSync(dir, { recursive: true });
-  [16, 32, 48, 128].forEach(function (size) {
-    const png = encodePNG(size, iconPixel);
+  const shapes = buildShapes();
+  const svgPath = path.join(dir, 'icon.svg');
+  fs.writeFileSync(svgPath, toSvg(shapes));
+  process.stdout.write('wrote ' + svgPath + '\n');
+  SIZES.forEach(function (size) {
     const file = path.join(dir, 'icon' + size + '.png');
-    fs.writeFileSync(file, png);
+    const drawing = size <= 16 ? buildCompactShapes() : shapes;
+    const view = size <= 16 ? 16 : VIEW;
+    fs.writeFileSync(file, encodePNG(size, drawing, view));
     process.stdout.write('wrote ' + file + '\n');
   });
 }
