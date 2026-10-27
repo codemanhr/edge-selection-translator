@@ -1,0 +1,44 @@
+{
+  "manifest_version": 3,
+  "name": "划词翻译",
+  "version": "1.0.0",
+  "description": "选中网页文字，在光标旁显示翻译。Translate selected text in a compact panel beside the cursor.",
+  "author": "codemanhr",
+  "minimum_chrome_version": "109",
+  "action": {
+    "default_title": "划词翻译",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "background": {
+    "service_worker": "src/background/service-worker.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["http://*/*", "https://*/*"],
+      "js": [
+        "src/lib/constants.js",
+        "src/lib/panel-logic.js",
+        "src/lib/position.js",
+        "src/content/panel.css.js",
+        "src/content/panel.js",
+        "src/content/content.js"
+      ],
+      "run_at": "document_idle",
+      "all_frames": true
+    }
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'; style-src 'self'; img-src 'self' data:"
+  }
+}
