@@ -99,7 +99,7 @@ test('manifest commands match the command catalog', function () {
   const worker = fs.readFileSync(path.join(root, 'src/background/service-worker.js'), 'utf8');
   assert.match(worker, /force-translate/);
   assert.match(worker, /toggle-enabled/);
-  assert.deepEqual(manifest.permissions, ['storage']);
+  assert.deepEqual(manifest.permissions, ['storage', 'contextMenus']);
   assert.equal(manifest.action.default_popup, 'src/popup/popup.html');
   assert.equal(manifest.options_ui.page, 'src/options/options.html');
 });

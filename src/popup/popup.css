@@ -41,10 +41,32 @@ select {
   color: var(--ink);
   font-size: 13px;
 }
+.wide {
+  width: 100%;
+  margin-top: 10px;
+  border: 1px solid var(--line);
+  background: #fff;
+  border-radius: 8px;
+  padding: 6px 8px;
+  cursor: pointer;
+}
+#recent { list-style: none; margin: 8px 0 0; padding: 0; }
+#recent li { padding: 4px 0; border-top: 1px solid var(--line); color: var(--muted); }
+#recent b { display: block; color: var(--ink); font-weight: 600; }
 .keys { margin: 10px 0 0; color: var(--muted); font-size: 11px; }
 kbd {
   border: 1px solid var(--line);
   border-radius: 4px;
   padding: 0 3px;
   font-family: ui-monospace, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --ink: #f3f3f4;
+    --muted: #c6c6c8;
+    --line: rgba(255, 255, 255, 0.14);
+    --accent: #6cb6ff;
+  }
+  body, select, .wide { background: rgba(28, 28, 30, 0.94); color: var(--ink); }
 }

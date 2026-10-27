@@ -41,9 +41,71 @@
           <option value="bing">Bing 翻译（免密钥，默认）</option>
           <option value="google">Google 翻译（免密钥，非官方）</option>
           <option value="mymemory">MyMemory（免密钥，有配额）</option>
+          <option value="deepl">DeepL（需要密钥）</option>
+          <option value="openai">OpenAI 兼容接口（需要密钥）</option>
+          <option value="libretranslate">LibreTranslate（可选密钥）</option>
+          <option value="azure">Azure 翻译（需要密钥）</option>
         </select>
       </label>
       <p class="hint" id="engine-hint"></p>
+    </section>
+
+    <section>
+      <h2>语气 <span>Style</span></h2>
+      <div class="grid">
+        <label>风格 Style
+          <select id="style">
+            <option value="normal">普通 Neutral</option>
+            <option value="colloquial">更口语 Colloquial</option>
+            <option value="formal">更正式 Formal</option>
+          </select>
+        </label>
+        <label>外观 Theme
+          <select id="theme">
+            <option value="system">跟随系统 System</option>
+            <option value="light">浅色 Light</option>
+            <option value="dark">深色 Dark</option>
+          </select>
+        </label>
+      </div>
+      <label class="check">
+        <input id="names" type="checkbox">
+        <span>尽量不翻译专名、缩写和网址<br><small>Keep proper nouns, acronyms, and URLs</small></span>
+      </label>
+      <p class="hint">语气对 DeepL（formality）和 OpenAI 兼容接口有效。Bing、Google、MyMemory、LibreTranslate 和 Azure 会提示已按普通风格翻译。</p>
+    </section>
+
+    <section class="stack">
+      <h2>API 密钥 <span>Stored only on this device</span></h2>
+      <label>DeepL API Key
+        <input id="deepl-key" type="password" autocomplete="off" spellcheck="false">
+      </label>
+      <label class="check">
+        <input id="deepl-pro" type="checkbox">
+        <span>使用 DeepL Pro 端点（api.deepl.com）</span>
+      </label>
+      <label>OpenAI 兼容 Base URL
+        <input id="openai-url" type="url" placeholder="https://api.openai.com/v1" autocomplete="off" spellcheck="false">
+      </label>
+      <label>OpenAI 兼容 API Key
+        <input id="openai-key" type="password" autocomplete="off" spellcheck="false">
+      </label>
+      <label>模型 Model
+        <input id="openai-model" type="text" placeholder="gpt-4o-mini" autocomplete="off" spellcheck="false">
+      </label>
+      <label>LibreTranslate URL
+        <input id="libre-url" type="url" placeholder="https://libretranslate.com" autocomplete="off" spellcheck="false">
+      </label>
+      <label>LibreTranslate API Key
+        <input id="libre-key" type="password" autocomplete="off" spellcheck="false">
+      </label>
+      <label>Azure Translator Key
+        <input id="azure-key" type="password" autocomplete="off" spellcheck="false">
+      </label>
+      <label>Azure Region
+        <input id="azure-region" type="text" placeholder="global" autocomplete="off" spellcheck="false">
+      </label>
+      <p class="hint">密钥只保存在 chrome.storage.local。选择这些引擎或填写自定义地址时，浏览器会询问是否允许访问对应网站。公共 LibreTranslate 实例经常需要密钥。</p>
     </section>
 
     <section>
@@ -55,11 +117,34 @@
       <p class="hint">组合键可在 edge://extensions/shortcuts 里修改。如果按键没有反应，多半是被浏览器占用了。</p>
     </section>
 
+    <section>
+      <h2>网站黑名单 <span>Skip these sites</span></h2>
+      <div class="row">
+        <input id="host" type="text" placeholder="example.com" autocomplete="off">
+        <button id="add-host" type="button">添加</button>
+      </div>
+      <ul id="blacklist" class="list"></ul>
+      <p class="hint">匹配该域名及其子域名。右键菜单或工具栏弹窗也可以停用当前网站。代码块里的选区始终跳过。</p>
+    </section>
+
+    <section>
+      <h2>最近翻译 <span>History</span></h2>
+      <ul id="history" class="list"></ul>
+      <button id="clear-history" type="button" class="ghost">清空历史</button>
+    </section>
+
+    <section>
+      <h2>收藏 <span>Favorites</span></h2>
+      <ul id="favorites" class="list"></ul>
+    </section>
+
     <p class="saved" id="saved" hidden>已保存</p>
   </main>
   <script src="../lib/constants.js"></script>
   <script src="../lib/languages.js"></script>
   <script src="../lib/settings.js"></script>
+  <script src="../lib/blacklist.js"></script>
+  <script src="../lib/history.js"></script>
   <script src="../lib/commands.js"></script>
   <script src="options.js"></script>
 </body>

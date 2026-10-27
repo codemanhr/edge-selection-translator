@@ -62,6 +62,12 @@
       '  <button type="button" data-role="copy">复制译文</button>',
       '  <button type="button" data-role="speak-original">读原文</button>',
       '  <button type="button" data-role="speak-translation">读译文</button>',
+      '  <button type="button" data-role="fav" aria-pressed="false">收藏</button>',
+      '  <select data-role="style" aria-label="翻译风格" title="翻译风格">',
+      '    <option value="normal">普通</option>',
+      '    <option value="colloquial">口语</option>',
+      '    <option value="formal">正式</option>',
+      '  </select>',
       '</div>',
       '<div class="original" data-role="original"></div>',
       '<div class="status" data-role="status"></div>'
@@ -80,6 +86,8 @@
     const copyBtn = panel.querySelector('[data-role="copy"]');
     const speakOriginalBtn = panel.querySelector('[data-role="speak-original"]');
     const speakTranslationBtn = panel.querySelector('[data-role="speak-translation"]');
+    const favBtn = panel.querySelector('[data-role="fav"]');
+    const styleSelect = panel.querySelector('[data-role="style"]');
 
     function fillSelect(select, includeAuto, selected) {
       select.textContent = '';
@@ -107,7 +115,9 @@
       onSwap: function () {},
       onCopy: function () {},
       onSpeakOriginal: function () {},
-      onSpeakTranslation: function () {}
+      onSpeakTranslation: function () {},
+      onFavorite: function () {},
+      onStyleChange: function () {}
     };
 
     function place(point) {
@@ -141,10 +151,16 @@
       if (options.engineLabel != null) engineName = options.engineLabel || '';
       if (options.sourceLang) sourceSelect.value = options.sourceLang;
       if (options.targetLang) targetSelect.value = options.targetLang;
+      if (options.style) styleSelect.value = options.style;
+      panel.classList.remove('force-dark', 'force-light');
+      if (options.theme === 'dark') panel.classList.add('force-dark');
+      if (options.theme === 'light') panel.classList.add('force-light');
       originalEl.textContent = currentText;
       loading = !!options.loading;
       if (loading) {
         translated = '';
+        favBtn.textContent = '收藏';
+        favBtn.setAttribute('aria-pressed', 'false');
         bodyEl.textContent = '正在翻译…';
         bodyEl.classList.add('loading');
       } else {
@@ -208,6 +224,12 @@
       event.stopPropagation();
       handlers.onSpeakTranslation();
     });
+    favBtn.addEventListener('click', function (event) {
+      event.preventDefault();
+      event.stopPropagation();
+      handlers.onFavorite();
+    });
+    styleSelect.addEventListener('change', function () { handlers.onStyleChange(); });
 
     (doc.documentElement || doc.body).appendChild(host);
 
@@ -221,6 +243,12 @@
       getTranslation: function () { return loading ? '' : translated; },
       getDetected: function () { return detected; },
       setStatus: function (text) { statusEl.textContent = text || ''; },
+      getStyle: function () { return styleSelect.value || 'normal'; },
+      setStyle: function (style) { if (style) styleSelect.value = style; },
+      setFavorite: function (on) {
+        favBtn.textContent = on ? '已收藏' : '收藏';
+        favBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
+      },
       getChoice: function () {
         return { source: sourceSelect.value || 'auto', target: targetSelect.value || 'zh-Hans' };
       },

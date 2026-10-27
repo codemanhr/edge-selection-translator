@@ -46,7 +46,7 @@ h2 {
 }
 h2 span { color: var(--muted); font-weight: 500; font-size: 13px; margin-left: 6px; }
 label { display: block; font-size: 13px; color: var(--muted); }
-select {
+select, .stack input {
   display: block;
   width: 100%;
   margin-top: 6px;
@@ -78,7 +78,51 @@ kbd {
   background: #f7f9fc;
   font: 12px/1.6 ui-monospace, "Cascadia Mono", monospace;
 }
+.row { display: flex; gap: 8px; }
+.row input {
+  flex: 1;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  font: inherit;
+}
+button {
+  border: 1px solid var(--line);
+  background: #fff;
+  border-radius: 8px;
+  padding: 7px 10px;
+  cursor: pointer;
+  font: inherit;
+}
+button.ghost { margin-top: 8px; }
+.list { list-style: none; margin: 10px 0 0; padding: 0; }
+.list li {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-top: 1px solid var(--line);
+}
+.phrase { min-width: 0; }
+.phrase b, .phrase span { display: block; overflow-wrap: anywhere; }
+.phrase span { color: var(--muted); font-size: 13px; }
+.actions { display: flex; gap: 6px; flex: none; }
+.actions button { padding: 4px 8px; font-size: 12px; }
 .saved { color: var(--accent); font-size: 13px; min-height: 1.2em; }
 @media (max-width: 640px) {
   .grid { grid-template-columns: 1fr; }
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --bg: #10141b;
+    --card: rgba(28, 32, 40, 0.92);
+    --ink: #f3f3f4;
+    --muted: #c6c6c8;
+    --line: rgba(255, 255, 255, 0.14);
+    --accent: #6cb6ff;
+    --soft: rgba(108, 182, 255, 0.16);
+  }
+  select, button, .row input, kbd { background: #1c2028; color: var(--ink); }
 }

@@ -8,8 +8,8 @@ Later stages are not started until the previous stage is green.
 | A. MV3 scaffold | PASS | 2026-10-27 |
 | B. Translation pipeline | PASS | 2026-10-27 |
 | C. Copy, TTS, shortcuts, options | PASS | 2026-10-27 |
-| D. History, favorites, blacklist, code skip | pending | |
-| E. Engines, style, dark UI | pending | |
+| D. History, favorites, blacklist, code skip | PASS | 2026-10-27 |
+| E. Engines, style, dark UI | PASS | 2026-10-27 |
 | F. Store docs and hygiene | pending | |
 
 ## Stage A — MV3 scaffold
@@ -85,3 +85,48 @@ Checks:
 - `npm run smoke:e2e` — `SMOKE_E2E_OK` (panel still translates after the new buttons and settings boot)
 
 Not in this stage: history, favorites, site blacklist, code-block skipping.
+
+## Stage D — History, favorites, blacklist, code skip
+
+Status: PASS (2026-10-27)
+
+What shipped:
+
+- Recent translations (50) and favorites (100) stay in `chrome.storage.local`. The same source text and target language collapse to one history row. The panel favorite button and the options page can add, remove, or clear entries
+- Per-site blacklist matches the host and its subdomains (`github.com` covers `gist.github.com`, not `notgithub.com`). The popup, options page, and the page context menu can add or remove the current site
+- Context menus: “翻译选中文字” force-translates the selection; “在此网站停用 / 恢复划词翻译” toggles the blacklist
+- Selections inside `pre`, `code`, `kbd`, `samp`, `role=code`, or known editor/highlighter surfaces (Monaco, CodeMirror, Ace, highlight.js, Shiki, GitHub blob code, and similar) do not open the panel. Password fields stay skipped. Force-translate does not override a code or password context
+
+Checks:
+
+- `npm test` — 34 passed, 0 failed (recorded before the stage E tests were added)
+  - HTML fixtures: code tags and editor classes are skipped; ordinary prose, a generic `highlight` class, and a generic textarea are not
+  - blacklist exact and subdomain rules; history dedupe and favorite toggle
+  - manifest content-script order includes the code detector; `contextMenus` and the blacklist menu id are present
+- `npm run smoke:e2e` — exit 0
+  - Selecting `const skip = true` inside `<pre><code id="code">` left the panel `display:none` and did not copy that text into the original slot
+  - The prose selection still translated (`SMOKE_E2E_OK`)
+
+## Stage E — Engines, style, dark UI
+
+Status: PASS (2026-10-27)
+
+What shipped:
+
+- Engine router. Free engines (`bing`, `google`, `mymemory`) try the chosen engine first, then the other free engines. Keyed engines (`deepl`, `openai`, `libretranslate`, `azure`) try themselves, then the free chain. A missing key is an error and falls through. The panel says which engine was used
+- Optional keys live in `chrome.storage.local` (`estSettings.api`): DeepL (free or Pro), OpenAI-compatible chat completions (base URL, model, key), LibreTranslate (URL and optional key), Azure Translator (key and region). Saving a keyed engine asks for optional host permission from the options page (`https://*/*`, plus localhost / 127.0.0.1 for a self-hosted LibreTranslate). Required host permissions stay the three free origins
+- Style: normal / colloquial / formal. DeepL sends `formality=prefer_less` or `prefer_more` and retries without it on HTTP 400. OpenAI puts the tone in the system prompt. Other engines translate normally and the panel notes that the tone was not applied
+- Proper nouns: URLs, emails, ALL-CAPS acronyms, and multi-word Title Case names are replaced with `XPNnX` placeholders before the request and restored after. Single capitalized words are left alone. The option can be turned off
+- Dark mode follows `prefers-color-scheme`, with explicit light and dark overrides. The panel stays compact and semi-transparent
+
+Checks:
+
+- `npm test` — 37 passed, 0 failed
+  - proper-noun round trip through a mocked Google response; formal Google notes the unsupported tone
+  - DeepL formal body contains `formality=prefer_more` and `target_lang=DE`; a missing key falls back to Google and the result JSON does not contain the key
+  - `chainFor('deepl')` is `deepl`, `bing`, `google`, `mymemory`
+  - panel, options, and popup CSS include `prefers-color-scheme: dark`; panel dark tokens `--est-bg: rgba(28, 28, 30, 0.88)` and `--est-fg: #f3f3f4`; options dark `--bg: #10141b`
+  - `node --check` on every `src/**/*.js`, including the options page
+- `npm run smoke:e2e` — `SMOKE_E2E_OK` and `SMOKE_INJECT_OK`, exit 0, after the style control, theme class, and optional host permissions were added. Headless Chrome still falls back from Bing to Google, as in stage B
+
+Not in this stage: privacy policy, store listing, bilingual README.

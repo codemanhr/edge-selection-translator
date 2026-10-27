@@ -270,10 +270,189 @@
     return { text: pieces.join(''), detectedLang: request.detected || '' };
   }
 
+  function styleLine(style) {
+    if (style === 'colloquial') return 'Use a more colloquial, conversational tone.';
+    if (style === 'formal') return 'Use a more formal, professional tone.';
+    return 'Use a natural, neutral tone.';
+  }
+
+  function deeplSourceCode(code) {
+    const mapped = langApi().engineCode(code, 'deepl');
+    if (!mapped) return '';
+    if (mapped.indexOf('ZH') === 0) return 'ZH';
+    if (mapped.indexOf('EN') === 0) return 'EN';
+    if (mapped.indexOf('PT') === 0) return 'PT';
+    return mapped;
+  }
+
+  async function translateDeepL(request, deps) {
+    const api = request.api || {};
+    if (!api.deeplKey) throw EngineError('未填写 DeepL API 密钥', { engine: 'deepl' });
+    const langs = langApi();
+    const target = langs.engineCode(request.targetLang, 'deepl');
+    if (!target) throw EngineError('DeepL 不支持该目标语言', { engine: 'deepl' });
+    const host = api.deeplPro ? 'https://api.deepl.com' : 'https://api-free.deepl.com';
+    const formality = request.style === 'formal' ? 'prefer_more' : request.style === 'colloquial' ? 'prefer_less' : '';
+
+    async function call(useFormality) {
+      const body = new URLSearchParams();
+      body.set('text', request.text);
+      body.set('target_lang', target);
+      if (request.sourceLang && request.sourceLang !== 'auto') {
+        const source = deeplSourceCode(request.sourceLang);
+        if (source) body.set('source_lang', source);
+      }
+      if (useFormality && formality) body.set('formality', formality);
+      const response = await httpRequest(host + '/v2/translate', {
+        method: 'POST',
+        engine: 'deepl',
+        headers: {
+          Authorization: 'DeepL-Auth-Key ' + api.deeplKey,
+          'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: body.toString()
+      }, deps);
+      const raw = await response.text();
+      if (!response.ok) {
+        throw EngineError('DeepL 翻译失败（HTTP ' + response.status + '）', { engine: 'deepl', status: response.status });
+      }
+      let data;
+      try { data = JSON.parse(raw); } catch (err) {
+        throw EngineError('DeepL 返回了无法解析的结果', { engine: 'deepl' });
+      }
+      const row = data.translations && data.translations[0];
+      if (!row || !row.text) throw EngineError('DeepL 返回空结果', { engine: 'deepl' });
+      return {
+        text: row.text,
+        detectedLang: langs.normalizeCode(row.detected_source_language),
+        styleApplied: !!(useFormality && formality)
+      };
+    }
+
+    try {
+      return await call(true);
+    } catch (err) {
+      if (formality && err && err.status === 400) return call(false);
+      throw err;
+    }
+  }
+
+  async function translateOpenAI(request, deps) {
+    const api = request.api || {};
+    if (!api.openaiKey) throw EngineError('未填写 OpenAI 兼容接口的密钥', { engine: 'openai' });
+    const base = String(api.openaiBaseUrl || 'https://api.openai.com/v1').replace(/\/+$/, '');
+    const langs = langApi();
+    const system = [
+      'You are a translator. Translate the user text into ' + langs.languageName(request.targetLang) + '.',
+      styleLine(request.style),
+      request.keepProperNouns === false ? '' : 'Keep proper nouns, brand names, URLs, and tokens like XPN0X unchanged.',
+      'Output only the translation.'
+    ].filter(Boolean).join(' ');
+    const response = await httpRequest(base + '/chat/completions', {
+      method: 'POST',
+      engine: 'openai',
+      headers: {
+        Authorization: 'Bearer ' + api.openaiKey,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: api.openaiModel || 'gpt-4o-mini',
+        temperature: request.style && request.style !== 'normal' ? 0.4 : 0.2,
+        messages: [
+          { role: 'system', content: system },
+          { role: 'user', content: request.text }
+        ]
+      })
+    }, deps);
+    const raw = await response.text();
+    if (!response.ok) {
+      throw EngineError('OpenAI 兼容接口失败（HTTP ' + response.status + '）', { engine: 'openai', status: response.status });
+    }
+    let data;
+    try { data = JSON.parse(raw); } catch (err) {
+      throw EngineError('OpenAI 兼容接口返回了无法解析的结果', { engine: 'openai' });
+    }
+    const text = data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
+    if (!text || !String(text).trim()) throw EngineError('OpenAI 兼容接口返回空结果', { engine: 'openai' });
+    return {
+      text: String(text).trim(),
+      detectedLang: request.detected || '',
+      styleApplied: true
+    };
+  }
+
+  async function translateLibre(request, deps) {
+    const api = request.api || {};
+    const base = String(api.libreUrl || 'https://libretranslate.com').replace(/\/+$/, '');
+    const langs = langApi();
+    const target = langs.engineCode(request.targetLang, 'libre');
+    if (!target) throw EngineError('LibreTranslate 不支持该目标语言', { engine: 'libretranslate' });
+    const source = !request.sourceLang || request.sourceLang === 'auto'
+      ? 'auto'
+      : (langs.engineCode(request.sourceLang, 'libre') || 'auto');
+    const response = await httpRequest(base + '/translate', {
+      method: 'POST',
+      engine: 'libretranslate',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        q: request.text,
+        source: source,
+        target: target,
+        format: 'text',
+        api_key: api.libreKey || ''
+      })
+    }, deps);
+    const raw = await response.text();
+    if (!response.ok) {
+      throw EngineError('LibreTranslate 失败（HTTP ' + response.status + '）', { engine: 'libretranslate', status: response.status });
+    }
+    let data;
+    try { data = JSON.parse(raw); } catch (err) {
+      throw EngineError('LibreTranslate 返回了无法解析的结果', { engine: 'libretranslate' });
+    }
+    if (!data.translatedText) {
+      throw EngineError(data.error || 'LibreTranslate 返回空结果', { engine: 'libretranslate' });
+    }
+    return { text: data.translatedText, detectedLang: request.detected || '', styleApplied: false };
+  }
+
+  async function translateAzure(request, deps) {
+    const api = request.api || {};
+    if (!api.azureKey) throw EngineError('未填写 Azure 翻译密钥', { engine: 'azure' });
+    const langs = langApi();
+    const params = new URLSearchParams({
+      'api-version': '3.0',
+      to: langs.engineCode(request.targetLang, 'bing')
+    });
+    if (request.sourceLang && request.sourceLang !== 'auto') {
+      params.set('from', langs.engineCode(request.sourceLang, 'bing'));
+    }
+    const response = await httpRequest('https://api.cognitive.microsofttranslator.com/translate?' + params.toString(), {
+      method: 'POST',
+      engine: 'azure',
+      headers: {
+        'Ocp-Apim-Subscription-Key': api.azureKey,
+        'Ocp-Apim-Subscription-Region': api.azureRegion || 'global',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify([{ Text: request.text }])
+    }, deps);
+    const raw = await response.text();
+    if (!response.ok) {
+      throw EngineError('Azure 翻译失败（HTTP ' + response.status + '）', { engine: 'azure', status: response.status });
+    }
+    const parsed = parseBingTranslation(raw);
+    return { text: parsed.text, detectedLang: parsed.detectedLang, styleApplied: false };
+  }
+
   async function runEngine(engine, request, deps) {
     if (engine === 'bing') return translateBing(request, deps);
     if (engine === 'google') return translateGoogle(request, deps);
     if (engine === 'mymemory') return translateMyMemory(request, deps);
+    if (engine === 'deepl') return translateDeepL(request, deps);
+    if (engine === 'openai') return translateOpenAI(request, deps);
+    if (engine === 'libretranslate') return translateLibre(request, deps);
+    if (engine === 'azure') return translateAzure(request, deps);
     throw EngineError('未知翻译引擎', { engine: engine });
   }
 
@@ -288,6 +467,10 @@
     translateBing,
     translateGoogle,
     translateMyMemory,
+    translateDeepL,
+    translateOpenAI,
+    translateLibre,
+    translateAzure,
     runEngine
   };
 });

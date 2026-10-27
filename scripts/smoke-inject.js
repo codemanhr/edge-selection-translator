@@ -202,6 +202,35 @@ async function main() {
     if (!dismissed.result || dismissed.result.value !== 'none') {
       throw new Error('outside click did not dismiss: ' + JSON.stringify(dismissed));
     }
+    await send(ws, 7, 'Runtime.evaluate', {
+      expression: `(function () {
+        const el = document.getElementById('code');
+        const range = document.createRange();
+        range.selectNodeContents(el);
+        const sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(range);
+        el.dispatchEvent(new MouseEvent('mouseup', {
+          bubbles: true, cancelable: true, button: 0, clientX: 30, clientY: 80
+        }));
+        return true;
+      })()`,
+      returnByValue: true
+    });
+    await sleep(250);
+    const skipped = await send(ws, 8, 'Runtime.evaluate', {
+      expression: `(function () {
+        const host = document.getElementById('est-selection-translator-host');
+        const original = host && host.shadowRoot && host.shadowRoot.querySelector('[data-role="original"]');
+        const text = original ? original.textContent : '';
+        return { display: host ? host.style.display : 'missing', text: text };
+      })()`,
+      returnByValue: true
+    });
+    const skipValue = skipped.result && skipped.result.value;
+    if (!skipValue || skipValue.display !== 'none' || skipValue.text.indexOf('const skip') !== -1) {
+      throw new Error('code selection was not skipped: ' + JSON.stringify(skipped));
+    }
     if (process.argv.indexOf('--e2e') !== -1) {
       await send(ws, 6, 'Runtime.evaluate', {
         expression: `(function () {

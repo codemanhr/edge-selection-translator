@@ -5,7 +5,7 @@
   "description": "选中网页文字，在光标旁显示翻译。Translate selected text in a compact panel beside the cursor.",
   "author": "codemanhr",
   "minimum_chrome_version": "109",
-  "permissions": ["storage"],
+  "permissions": ["storage", "contextMenus"],
   "commands": {
     "force-translate": {
       "suggested_key": { "default": "Alt+T" },
@@ -20,6 +20,11 @@
     "https://www.bing.com/*",
     "https://translate.googleapis.com/*",
     "https://api.mymemory.translated.net/*"
+  ],
+  "optional_host_permissions": [
+    "https://*/*",
+    "http://localhost/*",
+    "http://127.0.0.1/*"
   ],
   "action": {
     "default_title": "划词翻译",
@@ -53,6 +58,9 @@
         "src/lib/settings.js",
         "src/lib/clipboard.js",
         "src/lib/speech.js",
+        "src/lib/blacklist.js",
+        "src/lib/history.js",
+        "src/lib/code-detector.js",
         "src/lib/detect.js",
         "src/lib/direction.js",
         "src/lib/panel-logic.js",

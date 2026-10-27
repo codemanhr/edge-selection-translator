@@ -22,10 +22,16 @@
     const cached = globalThis.__EST_SETTINGS__ || {};
     return {
       enabled: cached.enabled !== false,
-      blacklisted: !!cached.blacklisted,
+      blacklisted: ESTNS.isBlacklisted
+        ? ESTNS.isBlacklisted(cached.blacklist || [], location.hostname)
+        : false,
       engine: cached.engine || 'bing',
       sourceLang: cached.sourceLang,
-      targetLang: cached.targetLang
+      targetLang: cached.targetLang,
+      style: cached.style || 'normal',
+      keepProperNouns: cached.keepProperNouns !== false,
+      theme: cached.theme || 'system',
+      api: cached.api || {}
     };
   }
 
@@ -61,13 +67,15 @@
     const seq = ++requestSeq;
     const choice = controller.getChoice();
     const flags = settingsSnapshot();
+    const style = controller.getStyle ? controller.getStyle() : flags.style;
     controller.open({
       x: point.x,
       y: point.y,
       original: text,
       translated: '',
       loading: true,
-      status: ''
+      status: '',
+      theme: flags.theme
     });
     let pending;
     try {
@@ -76,7 +84,10 @@
         text: text,
         sourceLang: choice.source,
         targetLang: choice.target,
-        engine: flags.engine
+        engine: flags.engine,
+        style: style,
+        keepProperNouns: flags.keepProperNouns,
+        api: flags.api
       });
     } catch (err) {
       pending = Promise.reject(err);
@@ -95,8 +106,11 @@
         loading: false,
         status: response.note || '',
         detected: response.detectedLang || '',
-        engineLabel: ESTNS.engineLabel ? ESTNS.engineLabel(response.engine) : (response.engine || '')
+        engineLabel: ESTNS.engineLabel ? ESTNS.engineLabel(response.engine) : (response.engine || ''),
+        theme: flags.theme
       });
+      rememberTranslation(text, response);
+      refreshFavorite(text, response.targetLang);
     }).catch(function () {
       if (seq !== requestSeq || !controller.isOpen()) return;
       showMessage(point, text, '无法连接扩展后台');
@@ -129,6 +143,32 @@
     }
     globalThis.__EST_LAST_SELECTION__ = decision.text;
     requestTranslation(decision.text, anchor);
+  }
+
+  function rememberTranslation(text, response) {
+    if (!ESTNS.addHistory || !ESTNS.loadSettings || !chrome.storage || !chrome.storage.local) return;
+    ESTNS.loadSettings(chrome.storage.local).then(function (settings) {
+      return ESTNS.saveSettings(chrome.storage.local, {
+        history: ESTNS.addHistory(settings.history, {
+          sourceText: text,
+          translatedText: response.translatedText,
+          sourceLang: response.sourceLang,
+          targetLang: response.targetLang,
+          engine: response.engine
+        })
+      });
+    }).catch(function () {});
+  }
+
+  function refreshFavorite(text, targetLang) {
+    if (!ESTNS.isFavorite || !chrome.storage || !chrome.storage.local) return;
+    ESTNS.loadSettings(chrome.storage.local).then(function (settings) {
+      if (!controller.isOpen() || controller.getText() !== text) return;
+      controller.setFavorite(ESTNS.isFavorite(settings.favorites, {
+        sourceText: text,
+        targetLang: targetLang || controller.getChoice().target
+      }));
+    }).catch(function () {});
   }
 
   function persistChoice(choice) {
@@ -190,12 +230,47 @@
     },
     onSpeakTranslation: function () {
       speak(controller.getTranslation(), controller.getChoice().target);
+    },
+    onStyleChange: function () {
+      const style = controller.getStyle();
+      globalThis.__EST_SETTINGS__ = Object.assign({}, globalThis.__EST_SETTINGS__ || {}, { style: style });
+      if (ESTNS.saveSettings && chrome.storage && chrome.storage.local) {
+        ESTNS.saveSettings(chrome.storage.local, { style: style }).catch(function () {});
+      }
+      const text = controller.getText();
+      if (text) requestTranslation(text, lastPointer);
+    },
+    onFavorite: function () {
+      const text = controller.getText();
+      const translated = controller.getTranslation();
+      if (!translated) {
+        controller.setStatus('还没有译文');
+        return;
+      }
+      const choice = controller.getChoice();
+      const entry = {
+        sourceText: text,
+        translatedText: translated,
+        sourceLang: choice.source === 'auto' ? (controller.getDetected() || '') : choice.source,
+        targetLang: choice.target,
+        engine: ''
+      };
+      ESTNS.loadSettings(chrome.storage.local).then(function (settings) {
+        const favorites = ESTNS.toggleFavorite(settings.favorites, entry);
+        return ESTNS.saveSettings(chrome.storage.local, { favorites: favorites }).then(function () {
+          controller.setFavorite(ESTNS.isFavorite(favorites, entry));
+          controller.setStatus(ESTNS.isFavorite(favorites, entry) ? '已加入收藏' : '已取消收藏');
+        });
+      }).catch(function () {
+        controller.setStatus('收藏失败');
+      });
     }
   });
 
   function applySettings(settings) {
     globalThis.__EST_SETTINGS__ = settings;
     controller.setChoice(settings.sourceLang, settings.targetLang);
+    if (controller.setStyle) controller.setStyle(settings.style || 'normal');
   }
 
   if (chrome.storage && chrome.storage.local && ESTNS.mergeSettings) {
@@ -210,9 +285,38 @@
     });
   }
 
-  chrome.runtime.onMessage.addListener(function (message) {
+  chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
     if (!message) return undefined;
-    if (message.type === 'force-translate') globalThis.__EST_FORCE_TRANSLATE__();
+    if (message.type === 'force-translate') {
+      globalThis.__EST_FORCE_TRANSLATE__();
+      return undefined;
+    }
+    if (message.type === 'site-status') {
+      const cached = globalThis.__EST_SETTINGS__ || {};
+      sendResponse({
+        host: location.hostname,
+        blacklisted: ESTNS.isBlacklisted
+          ? ESTNS.isBlacklisted(cached.blacklist || [], location.hostname)
+          : false
+      });
+      return true;
+    }
+    if (message.type === 'toggle-blacklist') {
+      ESTNS.loadSettings(chrome.storage.local).then(function (settings) {
+        const host = location.hostname;
+        const blacklist = ESTNS.isBlacklisted(settings.blacklist, host)
+          ? ESTNS.removeHost(settings.blacklist, host)
+          : ESTNS.addHost(settings.blacklist, host);
+        return ESTNS.saveSettings(chrome.storage.local, { blacklist: blacklist }).then(function (next) {
+          globalThis.__EST_SETTINGS__ = next;
+          sendResponse({
+            host: host,
+            blacklisted: ESTNS.isBlacklisted(next.blacklist, host)
+          });
+        });
+      }).catch(function () { sendResponse({ ok: false }); });
+      return true;
+    }
     return undefined;
   });
 

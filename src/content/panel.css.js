@@ -104,6 +104,32 @@ select {
 .tools button:hover { background: var(--est-soft); }
 .status { font-size: 11px; color: #8a4b08; }
 .status:empty { display: none; }
+@media (prefers-color-scheme: dark) {
+  .panel:not(.force-light) {
+    --est-bg: rgba(28, 28, 30, 0.88);
+    --est-fg: #f3f3f4;
+    --est-muted: #c6c6c8;
+    --est-border: rgba(255, 255, 255, 0.14);
+    --est-accent: #6cb6ff;
+    --est-soft: rgba(108, 182, 255, 0.16);
+  }
+}
+.panel.force-dark {
+  --est-bg: rgba(28, 28, 30, 0.88);
+  --est-fg: #f3f3f4;
+  --est-muted: #c6c6c8;
+  --est-border: rgba(255, 255, 255, 0.14);
+  --est-accent: #6cb6ff;
+  --est-soft: rgba(108, 182, 255, 0.16);
+}
+.panel.force-light {
+  --est-bg: rgba(255, 255, 255, 0.94);
+  --est-fg: #1c2430;
+  --est-muted: #5c6778;
+  --est-border: rgba(15, 23, 42, 0.12);
+  --est-accent: #0f6cbd;
+  --est-soft: rgba(15, 108, 189, 0.1);
+}
 `.trim();
 
   return { panelCSS };

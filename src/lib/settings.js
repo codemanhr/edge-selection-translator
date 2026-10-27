@@ -8,6 +8,7 @@
 
   const STORAGE_KEY = 'estSettings';
   const FREE_ENGINES = ['bing', 'google', 'mymemory'];
+  const ENGINES = ['bing', 'google', 'mymemory', 'deepl', 'openai', 'libretranslate', 'azure'];
   const STYLES = ['normal', 'colloquial', 'formal'];
 
   const DEFAULT_API = {
@@ -88,6 +89,7 @@
   return {
     STORAGE_KEY,
     FREE_ENGINES,
+    ENGINES,
     STYLES,
     DEFAULT_API,
     mergeSettings,

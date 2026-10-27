@@ -28,8 +28,32 @@
     ready = false;
     enabledInput.checked = settings.enabled !== false;
     fillTargets(settings.targetLang);
-    engineSelect.value = ESTNS.FREE_ENGINES.indexOf(settings.engine) === -1 ? 'bing' : settings.engine;
+    engineSelect.value = ESTNS.ENGINES.indexOf(settings.engine) === -1 ? 'bing' : settings.engine;
+    const recent = document.getElementById('recent');
+    recent.textContent = '';
+    (settings.history || []).slice(0, 3).forEach(function (entry) {
+      const li = document.createElement('li');
+      const strong = document.createElement('b');
+      strong.textContent = entry.translatedText || '';
+      const span = document.createElement('span');
+      span.textContent = entry.sourceText || '';
+      li.appendChild(strong);
+      li.appendChild(document.createTextNode(' '));
+      li.appendChild(span);
+      recent.appendChild(li);
+    });
     ready = true;
+  }
+
+  function paintSite(status) {
+    const button = document.getElementById('blacklist');
+    if (!status || !status.host) {
+      button.textContent = '此页面不能停用';
+      button.disabled = true;
+      return;
+    }
+    button.disabled = false;
+    button.textContent = (status.blacklisted ? '恢复' : '停用') + ' ' + status.host;
   }
 
   function persist() {
@@ -47,6 +71,24 @@
   document.getElementById('options').addEventListener('click', function () {
     chrome.runtime.openOptionsPage();
   });
+  document.getElementById('blacklist').addEventListener('click', function () {
+    chrome.tabs.query({ active: true, currentWindow: true }).then(function (tabs) {
+      const tab = tabs && tabs[0];
+      if (!tab || !tab.id) return;
+      chrome.tabs.sendMessage(tab.id, { type: 'toggle-blacklist' }).then(paintSite).catch(function () {
+        paintSite(null);
+      });
+    });
+  });
 
-  ESTNS.loadSettings(chrome.storage.local).then(apply);
+  ESTNS.loadSettings(chrome.storage.local).then(function (settings) {
+    apply(settings);
+    chrome.tabs.query({ active: true, currentWindow: true }).then(function (tabs) {
+      const tab = tabs && tabs[0];
+      if (!tab || !tab.id) return paintSite(null);
+      chrome.tabs.sendMessage(tab.id, { type: 'site-status' }).then(paintSite).catch(function () {
+        paintSite(null);
+      });
+    });
+  });
 })();

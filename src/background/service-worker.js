@@ -6,9 +6,12 @@ importScripts(
   '../lib/detect.js',
   '../lib/direction.js',
   '../lib/engines.js',
+  '../lib/proper-nouns.js',
   '../lib/router.js',
   '../lib/settings.js',
-  '../lib/commands.js'
+  '../lib/commands.js',
+  '../lib/blacklist.js',
+  '../lib/history.js'
 );
 
 const authCache = EST.createAuthCache();
@@ -20,7 +23,25 @@ async function refreshBadge() {
   return settings;
 }
 
-chrome.runtime.onInstalled.addListener(function () { refreshBadge(); });
+function installMenus() {
+  chrome.contextMenus.removeAll(function () {
+    chrome.contextMenus.create({
+      id: 'est-translate',
+      title: '翻译选中文字',
+      contexts: ['selection']
+    });
+    chrome.contextMenus.create({
+      id: 'est-blacklist',
+      title: '在此网站停用 / 恢复划词翻译',
+      contexts: ['page', 'selection']
+    });
+  });
+}
+
+chrome.runtime.onInstalled.addListener(function () {
+  refreshBadge();
+  installMenus();
+});
 chrome.runtime.onStartup.addListener(function () { refreshBadge(); });
 
 chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
@@ -52,6 +73,25 @@ chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
     return true;
   }
   return undefined;
+});
+
+chrome.contextMenus.onClicked.addListener(function (info, tab) {
+  if (!tab || !tab.id) return;
+  if (info.menuItemId === 'est-translate') {
+    const sent = chrome.tabs.sendMessage(tab.id, { type: 'force-translate' });
+    if (sent && typeof sent.catch === 'function') sent.catch(function () {});
+    return;
+  }
+  if (info.menuItemId === 'est-blacklist' && info.pageUrl) {
+    const host = EST.hostFromUrl(info.pageUrl);
+    if (!host) return;
+    EST.loadSettings(chrome.storage.local).then(function (settings) {
+      const blacklist = EST.isBlacklisted(settings.blacklist, host)
+        ? EST.removeHost(settings.blacklist, host)
+        : EST.addHost(settings.blacklist, host);
+      return EST.saveSettings(chrome.storage.local, { blacklist: blacklist });
+    }).catch(function () {});
+  }
 });
 
 chrome.commands.onCommand.addListener(function (command) {
