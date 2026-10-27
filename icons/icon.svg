@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" fill="none">
+  <title>蓝色圆角T图标</title>
+  <desc>透明背景，蓝色圆角方块，白色大写T，右下角橙色圆形右箭头</desc>
+  <rect x="8" y="8" width="240" height="240" rx="56" fill="#126CBB"/>
+  <path d="M66 61H190V96H147V194H109V96H66V61Z" fill="#FFFFFF"/>
+  <circle cx="203" cy="199" r="40" fill="#FFB441" stroke="#126CBB" stroke-width="6"/>
+  <path d="M175 190H207V180L228 199L207 218V208H175V190Z" fill="#115488"/>
+</svg>

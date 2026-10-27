@@ -13,9 +13,11 @@ importScripts(
   '../lib/blacklist.js',
   '../lib/history.js'
 );
+try {
+  importScripts('../lib/messaging.js');
+} catch (err) {}
 
 const authCache = EST.createAuthCache();
-console.log('est: worker start');
 
 async function refreshBadge() {
   const settings = await EST.loadSettings(chrome.storage.local);
@@ -45,6 +47,27 @@ chrome.runtime.onInstalled.addListener(function () {
 });
 chrome.runtime.onStartup.addListener(function () { refreshBadge(); });
 
+function translatePayload(message) {
+  return EST.translateText({
+    text: message.text,
+    sourceLang: message.sourceLang,
+    targetLang: message.targetLang,
+    engine: message.engine,
+    style: message.style,
+    keepProperNouns: message.keepProperNouns,
+    api: message.api
+  }, {
+    fetch: fetch,
+    authCache: authCache,
+    now: function () { return Date.now(); }
+  }).catch(function (err) {
+    return { ok: false, error: (err && err.message) || '翻译失败' };
+  });
+}
+
+// getPlatformInfo is a no-op event that keeps the worker alive until the
+// fetch chain calls sendResponse. Call it immediately: Edge can suspend an
+// inactive worker before a 2s interval fires.
 function keepWorkerAlive() {
   try { chrome.runtime.getPlatformInfo(function () {}); } catch (err) {}
   const timer = setInterval(function () {
@@ -53,35 +76,44 @@ function keepWorkerAlive() {
   return function () { clearInterval(timer); };
 }
 
+chrome.runtime.onConnect.addListener(function (port) {
+  if (!port || !port.name) return;
+  if (port.name === 'est-keepalive') {
+    const stop = keepWorkerAlive();
+    if (port.onDisconnect && port.onDisconnect.addListener) {
+      port.onDisconnect.addListener(function () { stop(); });
+    }
+    return;
+  }
+  // String compare first so a failed messaging.js import cannot make the
+  // worker ignore the port (EST.TRANSLATE_PORT would be undefined).
+  if (port.name !== 'est-translate' && port.name !== (EST && EST.TRANSLATE_PORT)) return;
+  if (!EST.attachTranslatePort) return;
+  EST.attachTranslatePort(port, {
+    translate: translatePayload,
+    keepAlive: keepWorkerAlive
+  });
+});
+
 chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
   if (!message || !message.type) return undefined;
-  if (message.type === 'est-ping' || message.type === 'translate') {
-    console.log('est: ' + message.type);
-  }
   if (message.type === 'est-ping') {
     sendResponse({ ok: true });
     return undefined;
   }
   if (message.type === 'translate') {
     const stop = keepWorkerAlive();
-    EST.translateText({
-      text: message.text,
-      sourceLang: message.sourceLang,
-      targetLang: message.targetLang,
-      engine: message.engine,
-      style: message.style,
-      keepProperNouns: message.keepProperNouns,
-      api: message.api
-    }, {
-      fetch: fetch,
-      authCache: authCache,
-      now: function () { return Date.now(); }
-    }).then(function (response) {
+    let pending;
+    try {
+      pending = translatePayload(message);
+    } catch (err) {
+      stop();
+      sendResponse({ ok: false, error: (err && err.message) || '翻译失败' });
+      return undefined;
+    }
+    Promise.resolve(pending).then(function (response) {
       stop();
       try { sendResponse(response); } catch (err) {}
-    }, function (err) {
-      stop();
-      try { sendResponse({ ok: false, error: (err && err.message) || '翻译失败' }); } catch (e) {}
     });
     return true;
   }

@@ -1,6 +1,6 @@
 {
   "name": "edge-selection-translator",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "private": true,
   "description": "Microsoft Edge (Chromium) selection translator extension",
   "license": "MIT",

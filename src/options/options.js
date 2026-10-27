@@ -19,6 +19,8 @@
   const azureKey = document.getElementById('azure-key');
   const azureRegion = document.getElementById('azure-region');
   const hint = document.getElementById('engine-hint');
+  const shortcutDisplay = document.getElementById('shortcut-display');
+  const shortcutList = document.getElementById('shortcut-list');
   const saved = document.getElementById('saved');
   let ready = false;
 
@@ -60,6 +62,7 @@
       style: styleSelect.value,
       theme: themeSelect.value,
       keepProperNouns: namesInput.checked,
+      shortcutDisplay: shortcutDisplay.value === 'mac' ? 'mac' : 'windows',
       api: {
         deeplKey: deeplKey.value.trim(),
         deeplPro: deeplPro.checked,
@@ -118,6 +121,8 @@
     styleSelect.value = settings.style || 'normal';
     themeSelect.value = settings.theme || 'system';
     namesInput.checked = settings.keepProperNouns !== false;
+    shortcutDisplay.value = settings.shortcutDisplay === 'mac' ? 'mac' : 'windows';
+    paintShortcuts(shortcutDisplay.value);
     const api = settings.api || {};
     deeplKey.value = api.deeplKey || '';
     deeplPro.checked = !!api.deeplPro;
@@ -211,6 +216,18 @@
     if (!settings.blacklist.length) blacklist.appendChild(empty('没有停用的网站'));
   }
 
+  function paintShortcuts(platform) {
+    shortcutList.textContent = '';
+    ESTNS.shortcutLines(platform).forEach(function (line) {
+      const li = document.createElement('li');
+      const kbd = document.createElement('kbd');
+      kbd.textContent = line.chord;
+      li.appendChild(kbd);
+      li.appendChild(document.createTextNode(' ' + line.detail));
+      shortcutList.appendChild(li);
+    });
+  }
+
   function empty(text) {
     const li = document.createElement('li');
     li.textContent = text;
@@ -231,9 +248,12 @@
 
   [
     enabledInput, sourceSelect, targetSelect, engineSelect, styleSelect, themeSelect, namesInput,
-    deeplKey, deeplPro, openaiUrl, openaiKey, openaiModel, libreUrl, libreKey, azureKey, azureRegion
+    shortcutDisplay, deeplKey, deeplPro, openaiUrl, openaiKey, openaiModel, libreUrl, libreKey, azureKey, azureRegion
   ].forEach(function (el) {
     el.addEventListener('change', persist);
+  });
+  shortcutDisplay.addEventListener('change', function () {
+    paintShortcuts(shortcutDisplay.value);
   });
 
   document.getElementById('add-host').addEventListener('click', function () {
@@ -255,5 +275,10 @@
     });
   });
 
-  ESTNS.loadSettings(chrome.storage.local).then(apply);
+  ESTNS.loadSettings(chrome.storage.local).then(function (settings) {
+    if (settings.shortcutDisplay === 'mac' || settings.shortcutDisplay === 'windows') return settings;
+    return ESTNS.saveSettings(chrome.storage.local, {
+      shortcutDisplay: ESTNS.detectShortcutPlatform(navigator)
+    });
+  }).then(apply);
 })();

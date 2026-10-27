@@ -47,8 +47,9 @@ test('README is bilingual and the store listing matches the manifest', function 
   const manifest = JSON.parse(read('manifest.json'));
   assert.match(readme, /加载解压缩的扩展/);
   assert.match(readme, /edge:\/\/extensions/);
-  assert.match(readme, /Partner Center/);
-  assert.match(readme, /权限说明/);
+  assert.equal(/Partner Center|发布到 Microsoft Edge/.test(readme), false);
+  assert.equal(/## 权限说明|Permissions are in the table/.test(readme), false);
+  assert.match(readme, /privacy-policy\.md/);
   assert.match(readme, /## English/);
   assert.match(readme, /Load unpacked/);
   assert.match(listing, /划词翻译/);
@@ -65,7 +66,11 @@ test('README is bilingual and the store listing matches the manifest', function 
 });
 
 test('icons are PNG at 16, 32, 48, and 128, and the pack zip is extension files only', function () {
-  [16, 32, 48, 128].forEach(function (size) {
+  const svg = fs.readFileSync(path.join(root, 'icons', 'icon.svg'), 'utf8');
+  assert.match(svg, /viewBox="0 0 256 256"/);
+  assert.match(svg, /#126CBB/);
+  assert.match(svg, /#FFB441/);
+  [16, 32, 48, 128, 300].forEach(function (size) {
     const buf = fs.readFileSync(path.join(root, 'icons', 'icon' + size + '.png'));
     assert.equal(buf.subarray(0, 8).toString('hex'), '89504e470d0a1a0a');
     assert.equal(buf.readUInt32BE(16), size);
