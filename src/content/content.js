@@ -93,9 +93,19 @@
       keepProperNouns: flags.keepProperNouns,
       api: flags.api
     };
-    const pending = ESTNS.sendExtensionMessage
-      ? ESTNS.sendExtensionMessage(payload, chrome.runtime)
-      : Promise.reject(new Error('无法连接扩展后台'));
+    let runtime = null;
+    let runtimeError = null;
+    try {
+      runtime = typeof chrome !== 'undefined' ? chrome.runtime : null;
+    } catch (err) {
+      runtimeError = err;
+    }
+    if (runtimeError || !ESTNS.sendExtensionMessage) {
+      const err = runtimeError || new Error('无法连接扩展后台');
+      showMessage(point, text, backgroundStatus(err));
+      return;
+    }
+    const pending = ESTNS.sendExtensionMessage(payload, runtime);
     pending.then(function (response) {
       if (seq !== requestSeq || !controller.isOpen() || controller.getText() !== text) return;
       if (!response || !response.ok) {
@@ -121,9 +131,13 @@
       }
     }).catch(function (err) {
       if (seq !== requestSeq || !controller.isOpen()) return;
-      const failed = !ESTNS.connectionFailure || ESTNS.connectionFailure(err);
-      showMessage(point, text, failed ? '无法连接扩展后台' : ((err && err.message) || '翻译失败'));
+      showMessage(point, text, backgroundStatus(err));
     });
+  }
+
+  function backgroundStatus(err) {
+    if (ESTNS.userFacingBackgroundError) return ESTNS.userFacingBackgroundError(err);
+    return (err && err.message) || '无法连接扩展后台';
   }
 
   function handleSelection(point, force) {
@@ -299,9 +313,9 @@
 
   chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
     if (!message) return undefined;
-    // runtime.sendMessage is broadcast to every frame. Translation replies
-    // belong to the service worker; answering here would close its port.
-    if (message.type === 'translate') return false;
+    // Translate uses the est-translate port. Returning false from a frame
+    // makes Edge close the worker's channel, so this listener stays unset.
+    if (message.type === 'translate' || message.type === 'est-ping') return undefined;
     if (message.type === 'force-translate') {
       globalThis.__EST_FORCE_TRANSLATE__();
       return undefined;

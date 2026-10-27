@@ -11,7 +11,8 @@ importScripts(
   '../lib/settings.js',
   '../lib/commands.js',
   '../lib/blacklist.js',
-  '../lib/history.js'
+  '../lib/history.js',
+  '../lib/messaging.js'
 );
 
 const authCache = EST.createAuthCache();
@@ -72,8 +73,20 @@ function keepWorkerAlive() {
   return function () { clearInterval(timer); };
 }
 
+chrome.runtime.onConnect.addListener(function (port) {
+  if (!port || port.name !== EST.TRANSLATE_PORT) return;
+  EST.attachTranslatePort(port, {
+    translate: translatePayload,
+    keepAlive: keepWorkerAlive
+  });
+});
+
 chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
   if (!message || !message.type) return undefined;
+  if (message.type === 'est-ping') {
+    sendResponse({ ok: true });
+    return undefined;
+  }
   if (message.type === 'translate') {
     const stop = keepWorkerAlive();
     let pending;
