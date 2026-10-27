@@ -163,16 +163,3 @@ Checks:
 | `npm test` | PASS, 40 tests |
 | Load unpacked in a normal Edge window | Needs a person |
 | Partner Center account, GitHub Pages, store screenshots, API keys | Needs a person |
-
-## Follow-up — Shortcut display labels
-
-Status: PASS (2026-10-27)
-
-The registered commands stay `Alt+T` and `Alt+Shift+T` in `manifest.json`. A `shortcutDisplay` field on `estSettings` (`auto`, `windows`, or `mac`) controls only the labels in the options page and the toolbar popup. `auto` is resolved once from `navigator.userAgentData.platform`, then `navigator.platform`, then the user agent, and stored as `windows` or `mac`. An unclear environment stays Windows / Linux. macOS labels are `⌥T（强制翻译）` and `⌥⇧T（开关）`.
-
-Checks:
-
-- `npm test` — 43 passed, 0 failed, including `tests/shortcuts.test.js`: Windows chords, macOS symbols, platform detection, and a settings round-trip that keeps `mac` when another field is saved
-- Manifest suggested keys remain `Alt+T` and `Alt+Shift+T`
-
-README was rewritten for readers and store submitters: install steps stay separate from `npm test` / `npm run pack`, and the screenshot section is the three images plus one note to replace them with Edge captures before submission.

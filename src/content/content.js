@@ -52,12 +52,7 @@
     return !!(root && root.host && root.host.id === (ESTNS.HOST_ID || 'est-selection-translator-host'));
   }
 
-  function stopSpeaking() {
-    if (ESTNS.stopSpeech) ESTNS.stopSpeech({ synth: window.speechSynthesis });
-  }
-
   function showMessage(anchor, original, status) {
-    stopSpeaking();
     controller.open({
       x: anchor.x,
       y: anchor.y,
@@ -69,7 +64,6 @@
   }
 
   function requestTranslation(text, point) {
-    stopSpeaking();
     const seq = ++requestSeq;
     const choice = controller.getChoice();
     const flags = settingsSnapshot();
@@ -83,61 +77,44 @@
       status: '',
       theme: flags.theme
     });
-    const payload = {
-      type: 'translate',
-      text: text,
-      sourceLang: choice.source,
-      targetLang: choice.target,
-      engine: flags.engine,
-      style: style,
-      keepProperNouns: flags.keepProperNouns,
-      api: flags.api
-    };
-    let runtime = null;
-    let runtimeError = null;
+    let pending;
     try {
-      runtime = typeof chrome !== 'undefined' ? chrome.runtime : null;
+      pending = chrome.runtime.sendMessage({
+        type: 'translate',
+        text: text,
+        sourceLang: choice.source,
+        targetLang: choice.target,
+        engine: flags.engine,
+        style: style,
+        keepProperNouns: flags.keepProperNouns,
+        api: flags.api
+      });
     } catch (err) {
-      runtimeError = err;
+      pending = Promise.reject(err);
     }
-    if (runtimeError || !ESTNS.sendExtensionMessage) {
-      const err = runtimeError || new Error('无法连接扩展后台');
-      showMessage(point, text, backgroundStatus(err));
-      return;
-    }
-    const pending = ESTNS.sendExtensionMessage(payload, runtime);
-    pending.then(function (response) {
+    Promise.resolve(pending).then(function (response) {
       if (seq !== requestSeq || !controller.isOpen() || controller.getText() !== text) return;
       if (!response || !response.ok) {
         showMessage(point, text, (response && response.error) || '翻译失败');
         return;
       }
-      try {
-        controller.open({
-          x: point.x,
-          y: point.y,
-          original: text,
-          translated: response.translatedText || '',
-          loading: false,
-          status: response.note || '',
-          detected: response.detectedLang || '',
-          engineLabel: ESTNS.engineLabel ? ESTNS.engineLabel(response.engine) : (response.engine || ''),
-          theme: flags.theme
-        });
-        rememberTranslation(text, response);
-        refreshFavorite(text, response.targetLang);
-      } catch (err) {
-        showMessage(point, text, (err && err.message) || '翻译失败');
-      }
-    }).catch(function (err) {
+      controller.open({
+        x: point.x,
+        y: point.y,
+        original: text,
+        translated: response.translatedText || '',
+        loading: false,
+        status: response.note || '',
+        detected: response.detectedLang || '',
+        engineLabel: ESTNS.engineLabel ? ESTNS.engineLabel(response.engine) : (response.engine || ''),
+        theme: flags.theme
+      });
+      rememberTranslation(text, response);
+      refreshFavorite(text, response.targetLang);
+    }).catch(function () {
       if (seq !== requestSeq || !controller.isOpen()) return;
-      showMessage(point, text, backgroundStatus(err));
+      showMessage(point, text, '无法连接扩展后台');
     });
-  }
-
-  function backgroundStatus(err) {
-    if (ESTNS.userFacingBackgroundError) return ESTNS.userFacingBackgroundError(err);
-    return (err && err.message) || '无法连接扩展后台';
   }
 
   function handleSelection(point, force) {
@@ -263,9 +240,6 @@
       const text = controller.getText();
       if (text) requestTranslation(text, lastPointer);
     },
-    onClose: function () {
-      stopSpeaking();
-    },
     onFavorite: function () {
       const text = controller.getText();
       const translated = controller.getTranslation();
@@ -313,9 +287,6 @@
 
   chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
     if (!message) return undefined;
-    // Translate uses the est-translate port. Returning false from a frame
-    // makes Edge close the worker's channel, so this listener stays unset.
-    if (message.type === 'translate' || message.type === 'est-ping') return undefined;
     if (message.type === 'force-translate') {
       globalThis.__EST_FORCE_TRANSLATE__();
       return undefined;

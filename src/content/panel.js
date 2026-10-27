@@ -117,8 +117,7 @@
       onSpeakOriginal: function () {},
       onSpeakTranslation: function () {},
       onFavorite: function () {},
-      onStyleChange: function () {},
-      onClose: function () {}
+      onStyleChange: function () {}
     };
 
     function place(point) {
@@ -180,7 +179,6 @@
     }
 
     function closePanel() {
-      const wasOpen = open;
       open = false;
       currentText = '';
       translated = '';
@@ -192,7 +190,6 @@
       originalEl.textContent = '';
       statusEl.textContent = '';
       metaEl.textContent = '';
-      if (wasOpen) handlers.onClose();
     }
 
     function move(x, y) {

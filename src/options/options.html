@@ -110,14 +110,11 @@
 
     <section>
       <h2>快捷键 <span>Shortcuts</span></h2>
-      <label>快捷键显示系统 Shortcut display
-        <select id="shortcut-display">
-          <option value="windows">Windows / Linux</option>
-          <option value="mac">macOS</option>
-        </select>
-      </label>
-      <ul id="shortcut-list" class="keys"></ul>
-      <p class="hint">这里只改变界面上的写法。浏览器登记的按键仍是 Alt，在 Mac 上对应 Option。可在 edge://extensions/shortcuts 里修改；如果按键没有反应，多半是被浏览器占用了。</p>
+      <ul class="keys">
+        <li><kbd>Alt</kbd> + <kbd>T</kbd> 强制翻译当前选区，即使总开关关闭</li>
+        <li><kbd>Alt</kbd> + <kbd>Shift</kbd> + <kbd>T</kbd> 开启或关闭划词翻译</li>
+      </ul>
+      <p class="hint">组合键可在 edge://extensions/shortcuts 里修改。如果按键没有反应，多半是被浏览器占用了。</p>
     </section>
 
     <section>
@@ -149,7 +146,6 @@
   <script src="../lib/blacklist.js"></script>
   <script src="../lib/history.js"></script>
   <script src="../lib/commands.js"></script>
-  <script src="../lib/shortcuts.js"></script>
   <script src="options.js"></script>
 </body>
 </html>

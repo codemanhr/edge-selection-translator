@@ -53,6 +53,13 @@ select {
 #recent { list-style: none; margin: 8px 0 0; padding: 0; }
 #recent li { padding: 4px 0; border-top: 1px solid var(--line); color: var(--muted); }
 #recent b { display: block; color: var(--ink); font-weight: 600; }
+.keys { margin: 10px 0 0; color: var(--muted); font-size: 11px; }
+kbd {
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 0 3px;
+  font-family: ui-monospace, monospace;
+}
 @media (prefers-color-scheme: dark) {
   :root {
     color-scheme: dark;

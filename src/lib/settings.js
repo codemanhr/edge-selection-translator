@@ -39,7 +39,6 @@
       style: style,
       keepProperNouns: src.keepProperNouns !== false,
       theme: src.theme === 'light' || src.theme === 'dark' ? src.theme : 'system',
-      shortcutDisplay: src.shortcutDisplay === 'mac' || src.shortcutDisplay === 'windows' ? src.shortcutDisplay : 'auto',
       blacklist: Array.isArray(src.blacklist) ? src.blacklist.map(String).slice(0, 200) : [],
       history: Array.isArray(src.history) ? src.history.slice(0, 50) : [],
       favorites: Array.isArray(src.favorites) ? src.favorites.slice(0, 100) : [],
