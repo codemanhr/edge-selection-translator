@@ -30,7 +30,7 @@ npm run pack
 - 鼠标选中文字后，在光标旁显示译文。面板顶部选择目标语言。点击面板外部、按 Esc 或滚动页面即可关闭。
 - 自动检测源语言，一键对调语言。源语言和目标语言相同时，会在中文和英文之间改译。
 - 复制译文。用 Web Speech API 朗读原文或译文。
-- 快捷键：`Alt+T` 强制翻译当前选区，`Alt+Shift+T` 开启或关闭划词翻译。可在 `edge://extensions/shortcuts` 里修改。
+- 快捷键：`Alt+T` 强制翻译当前选区，`Alt+Shift+T` 开启或关闭划词翻译。可在 `edge://extensions/shortcuts` 里修改。选项页和工具栏弹窗里的「快捷键显示系统」只改变界面写法：Windows / Linux 显示 `Alt+T`，macOS 显示 `⌥T` 与 `⌥⇧T`。浏览器登记的按键仍是 Alt，在 Mac 上对应 Option。第一次打开设置时会按系统自动选择，之后以你的选择为准。
 - 工具栏弹出页和选项页可改开关、语言、引擎、语气、主题和密钥。
 - 最近翻译（约 50 条）和收藏（约 100 条）保存在本机。
 - 按网站停用。`pre`、`code`、`kbd`、`samp` 以及 Monaco、CodeMirror、Ace、highlight.js、Shiki 等代码表面里的选区不翻译。密码框不读取。
@@ -72,19 +72,11 @@ npm run pack
 
 ## 截图
 
-下面三张是无头 Chrome 在本地示例页上的自动截图，尺寸 1280×800，用来看布局。Bing 在无头浏览器里常被拒绝，面板会改用 Google。上架前请在真实的 Edge 窗口里重拍，替换 `docs/screenshots/`。
-
 ![选中文字后的翻译面板](docs/screenshots/panel.png)
 
 ![选项页](docs/screenshots/options.png)
 
 ![工具栏弹出页](docs/screenshots/popup.png)
-
-若图片还没生成，在仓库根目录运行 `node scripts/capture-ui.js`（需要能加载扩展的 Chrome for Testing）。建议补拍的画面：
-
-1. 一篇普通文章上，选区旁边的翻译面板，能看到目标语言和译文。
-2. 选项页，能看到引擎、语气和「密钥只存在本机」。
-3. 点击工具栏图标后的弹出页，能看到开关和快捷键。
 
 ## 许可
 
@@ -109,7 +101,7 @@ Select text and a compact translation panel appears beside the cursor. The packa
 - A shadow-DOM panel opens next to the selection, with the target language at the top. Outside click, Esc, and page scroll dismiss it.
 - Local source-language detection and a one-click language swap. A same-language pair flips between Chinese and English.
 - Copy, and speak the original or the translation with the Web Speech API.
-- `Alt+T` force-translates. `Alt+Shift+T` toggles the feature. Change the keys at `edge://extensions/shortcuts`.
+- `Alt+T` force-translates. `Alt+Shift+T` toggles the feature. Change the keys at `edge://extensions/shortcuts`. The options page and toolbar popup have a Shortcut display control. It only changes labels (`Alt+T` on Windows/Linux, `⌥T` and `⌥⇧T` on macOS). The registered command stays Alt, which Edge maps to Option on a Mac. The first time settings load, the label style follows the system; your choice is then stored locally.
 - Popup and options page for the switch, languages, engine, tone, theme, and keys.
 - Local history (about 50) and favorites (about 100).
 - Per-site blacklist. Selections in `pre`, `code`, `kbd`, `samp`, and common editor surfaces are skipped. Password fields are ignored.
@@ -135,15 +127,11 @@ You need a Partner Center account. Checklist, following [the Edge publish guide]
 
 ### Screenshots
 
-The images under `docs/screenshots/` are 1280×800 captures from headless Chrome on a local fixture. Bing often rejects that user agent, so the panel may show the Google fallback. Retake them in a normal Edge window before you submit to the store.
-
 ![Selection panel](docs/screenshots/panel.png)
 
 ![Options](docs/screenshots/options.png)
 
 ![Toolbar popup](docs/screenshots/popup.png)
-
-Shots to replace: the panel beside a real article, the options page showing the engine and the on-device key note, and the toolbar popup with the enable switch.
 
 ### License
 

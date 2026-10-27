@@ -5,6 +5,8 @@
   const enabledInput = document.getElementById('enabled');
   const targetSelect = document.getElementById('target');
   const engineSelect = document.getElementById('engine');
+  const shortcutDisplay = document.getElementById('shortcut-display');
+  const shortcutKeys = document.getElementById('shortcut-keys');
   let ready = false;
 
   function fillTargets(selected) {
@@ -29,6 +31,8 @@
     enabledInput.checked = settings.enabled !== false;
     fillTargets(settings.targetLang);
     engineSelect.value = ESTNS.ENGINES.indexOf(settings.engine) === -1 ? 'bing' : settings.engine;
+    shortcutDisplay.value = settings.shortcutDisplay === 'mac' ? 'mac' : 'windows';
+    paintShortcuts(shortcutDisplay.value);
     const recent = document.getElementById('recent');
     recent.textContent = '';
     (settings.history || []).slice(0, 3).forEach(function (entry) {
@@ -43,6 +47,17 @@
       recent.appendChild(li);
     });
     ready = true;
+  }
+
+  function paintShortcuts(platform) {
+    shortcutKeys.textContent = '';
+    ESTNS.shortcutLines(platform).forEach(function (line, index) {
+      if (index) shortcutKeys.appendChild(document.createTextNode(' · '));
+      const kbd = document.createElement('kbd');
+      kbd.textContent = line.chord;
+      shortcutKeys.appendChild(kbd);
+      shortcutKeys.appendChild(document.createTextNode('（' + line.short + '）'));
+    });
   }
 
   function paintSite(status) {
@@ -68,6 +83,13 @@
   enabledInput.addEventListener('change', persist);
   targetSelect.addEventListener('change', persist);
   engineSelect.addEventListener('change', persist);
+  shortcutDisplay.addEventListener('change', function () {
+    paintShortcuts(shortcutDisplay.value);
+    if (!ready) return;
+    ESTNS.saveSettings(chrome.storage.local, {
+      shortcutDisplay: shortcutDisplay.value === 'mac' ? 'mac' : 'windows'
+    });
+  });
   document.getElementById('options').addEventListener('click', function () {
     chrome.runtime.openOptionsPage();
   });
@@ -82,6 +104,11 @@
   });
 
   ESTNS.loadSettings(chrome.storage.local).then(function (settings) {
+    if (settings.shortcutDisplay === 'mac' || settings.shortcutDisplay === 'windows') return settings;
+    return ESTNS.saveSettings(chrome.storage.local, {
+      shortcutDisplay: ESTNS.detectShortcutPlatform(navigator)
+    });
+  }).then(function (settings) {
     apply(settings);
     chrome.tabs.query({ active: true, currentWindow: true }).then(function (tabs) {
       const tab = tabs && tabs[0];
