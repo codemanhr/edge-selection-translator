@@ -55,22 +55,6 @@ Chrome 用 `chrome://extensions`，其余相同。
 7. 商店名称用「划词翻译」，须与清单一致。长描述从 [STORE_LISTING.md](STORE_LISTING.md) 复制，中英文各一份（250–10,000 个字符）。简短描述来自清单里的 `description`，要改就改清单后重新上传包。徽标至少 128×128，建议 300×300。截图最多 6 张，尺寸只能是 640×480 或 1280×800。
 8. 认证备注写清怎么试：打开 https 页面选中一句英文，应出现译文；在代码块里选中，不应出现面板。DeepL 等引擎需要审核员自己的密钥。提交后通常要几个工作日。
 
-## 截图
-
-选中文字后的面板：
-
-![选中文字后的翻译面板](docs/screenshots/panel.png)
-
-选项页：
-
-![选项页](docs/screenshots/options.png)
-
-工具栏弹窗：
-
-![工具栏弹出页](docs/screenshots/popup.png)
-
-上架前请在 Edge 里重新截图，替换 `docs/screenshots/` 中的文件。
-
 ## English
 
 Select text and the translation shows up beside the cursor.
@@ -89,7 +73,7 @@ Permissions are in the table above. Nothing is sent to the author. See [privacy-
 
 ### Publish
 
-Use a [Partner Center](https://partner.microsoft.com/dashboard/microsoftedge/overview) account and the checklist above. Upload `dist/edge-selection-translator.zip`. Category: Productivity. After GitHub Pages is enabled for `/docs` on `main`, the privacy policy URL is `https://codemanhr.github.io/edge-selection-translator/privacy-policy.html`. Listing text is in [STORE_LISTING.md](STORE_LISTING.md). Screenshots are in the section above.
+Use a [Partner Center](https://partner.microsoft.com/dashboard/microsoftedge/overview) account and the checklist above. Upload `dist/edge-selection-translator.zip`. Category: Productivity. After GitHub Pages is enabled for `/docs` on `main`, the privacy policy URL is `https://codemanhr.github.io/edge-selection-translator/privacy-policy.html`. Listing text is in [STORE_LISTING.md](STORE_LISTING.md).
 
 ## 开发
 
