@@ -77,43 +77,46 @@
       status: '',
       theme: flags.theme
     });
-    let pending;
-    try {
-      pending = chrome.runtime.sendMessage({
-        type: 'translate',
-        text: text,
-        sourceLang: choice.source,
-        targetLang: choice.target,
-        engine: flags.engine,
-        style: style,
-        keepProperNouns: flags.keepProperNouns,
-        api: flags.api
-      });
-    } catch (err) {
-      pending = Promise.reject(err);
-    }
-    Promise.resolve(pending).then(function (response) {
+    const payload = {
+      type: 'translate',
+      text: text,
+      sourceLang: choice.source,
+      targetLang: choice.target,
+      engine: flags.engine,
+      style: style,
+      keepProperNouns: flags.keepProperNouns,
+      api: flags.api
+    };
+    const pending = ESTNS.sendExtensionMessage
+      ? ESTNS.sendExtensionMessage(payload, chrome.runtime)
+      : Promise.reject(new Error('无法连接扩展后台'));
+    pending.then(function (response) {
       if (seq !== requestSeq || !controller.isOpen() || controller.getText() !== text) return;
       if (!response || !response.ok) {
         showMessage(point, text, (response && response.error) || '翻译失败');
         return;
       }
-      controller.open({
-        x: point.x,
-        y: point.y,
-        original: text,
-        translated: response.translatedText || '',
-        loading: false,
-        status: response.note || '',
-        detected: response.detectedLang || '',
-        engineLabel: ESTNS.engineLabel ? ESTNS.engineLabel(response.engine) : (response.engine || ''),
-        theme: flags.theme
-      });
-      rememberTranslation(text, response);
-      refreshFavorite(text, response.targetLang);
-    }).catch(function () {
+      try {
+        controller.open({
+          x: point.x,
+          y: point.y,
+          original: text,
+          translated: response.translatedText || '',
+          loading: false,
+          status: response.note || '',
+          detected: response.detectedLang || '',
+          engineLabel: ESTNS.engineLabel ? ESTNS.engineLabel(response.engine) : (response.engine || ''),
+          theme: flags.theme
+        });
+        rememberTranslation(text, response);
+        refreshFavorite(text, response.targetLang);
+      } catch (err) {
+        showMessage(point, text, (err && err.message) || '翻译失败');
+      }
+    }).catch(function (err) {
       if (seq !== requestSeq || !controller.isOpen()) return;
-      showMessage(point, text, '无法连接扩展后台');
+      const failed = !ESTNS.connectionFailure || ESTNS.connectionFailure(err);
+      showMessage(point, text, failed ? '无法连接扩展后台' : ((err && err.message) || '翻译失败'));
     });
   }
 
@@ -287,6 +290,9 @@
 
   chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
     if (!message) return undefined;
+    // runtime.sendMessage is broadcast to every frame. Translation replies
+    // belong to the service worker; answering here would close its port.
+    if (message.type === 'translate') return false;
     if (message.type === 'force-translate') {
       globalThis.__EST_FORCE_TRANSLATE__();
       return undefined;

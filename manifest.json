@@ -67,6 +67,7 @@
         "src/lib/position.js",
         "src/content/panel.css.js",
         "src/content/panel.js",
+        "src/lib/messaging.js",
         "src/content/content.js"
       ],
       "run_at": "document_idle",

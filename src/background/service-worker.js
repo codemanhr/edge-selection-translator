@@ -44,20 +44,49 @@ chrome.runtime.onInstalled.addListener(function () {
 });
 chrome.runtime.onStartup.addListener(function () { refreshBadge(); });
 
+function translatePayload(message) {
+  return EST.translateText({
+    text: message.text,
+    sourceLang: message.sourceLang,
+    targetLang: message.targetLang,
+    engine: message.engine,
+    style: message.style,
+    keepProperNouns: message.keepProperNouns,
+    api: message.api
+  }, {
+    fetch: fetch,
+    authCache: authCache,
+    now: function () { return Date.now(); }
+  }).catch(function (err) {
+    return { ok: false, error: (err && err.message) || '翻译失败' };
+  });
+}
+
+// getPlatformInfo is a no-op event that keeps the worker alive until the
+// fetch chain calls sendResponse. Without it, Edge can close the port
+// while Bing or the fallback engines are still in flight.
+function keepWorkerAlive() {
+  const timer = setInterval(function () {
+    try { chrome.runtime.getPlatformInfo(function () {}); } catch (err) {}
+  }, 2000);
+  return function () { clearInterval(timer); };
+}
+
 chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
   if (!message || !message.type) return undefined;
   if (message.type === 'translate') {
-    EST.translateText({
-      text: message.text,
-      sourceLang: message.sourceLang,
-      targetLang: message.targetLang,
-      engine: message.engine
-    }, {
-      fetch: fetch,
-      authCache: authCache,
-      now: function () { return Date.now(); }
-    }).then(sendResponse, function (err) {
+    const stop = keepWorkerAlive();
+    let pending;
+    try {
+      pending = translatePayload(message);
+    } catch (err) {
+      stop();
       sendResponse({ ok: false, error: (err && err.message) || '翻译失败' });
+      return undefined;
+    }
+    Promise.resolve(pending).then(function (response) {
+      stop();
+      try { sendResponse(response); } catch (err) {}
     });
     return true;
   }
