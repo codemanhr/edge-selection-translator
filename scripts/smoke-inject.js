@@ -174,12 +174,15 @@ async function main() {
       expression: `(function () {
         const host = document.getElementById('est-selection-translator-host');
         if (!host || !host.shadowRoot) return { ok: false, reason: 'missing host' };
+        const original = host.shadowRoot.querySelector('[data-role="original"]');
         const body = host.shadowRoot.querySelector('[data-role="body"]');
-        const text = body ? body.textContent : '';
+        const target = host.shadowRoot.querySelector('[data-role="target"]');
+        const text = ((original && original.textContent) || '') + ' ' + ((body && body.textContent) || '');
         return {
-          ok: host.style.display !== 'none' && text.indexOf('Hello translator') !== -1,
+          ok: host.style.display !== 'none' && text.indexOf('Hello translator') !== -1 && !!(target && target.options && target.options.length > 1),
           display: host.style.display,
-          text: text
+          text: text,
+          targetCount: target && target.options ? target.options.length : 0
         };
       })()`,
       returnByValue: true
@@ -198,6 +201,50 @@ async function main() {
     });
     if (!dismissed.result || dismissed.result.value !== 'none') {
       throw new Error('outside click did not dismiss: ' + JSON.stringify(dismissed));
+    }
+    if (process.argv.indexOf('--e2e') !== -1) {
+      await send(ws, 6, 'Runtime.evaluate', {
+        expression: `(function () {
+          const el = document.getElementById('sample');
+          const range = document.createRange();
+          range.selectNodeContents(el);
+          const sel = window.getSelection();
+          sel.removeAllRanges();
+          sel.addRange(range);
+          el.dispatchEvent(new MouseEvent('mouseup', {
+            bubbles: true, cancelable: true, button: 0, clientX: 48, clientY: 48
+          }));
+          return true;
+        })()`,
+        returnByValue: true
+      });
+      let translated = null;
+      for (let attempt = 0; attempt < 40; attempt += 1) {
+        await sleep(250);
+        translated = await send(ws, 200 + attempt, 'Runtime.evaluate', {
+          expression: `(function () {
+            const host = document.getElementById('est-selection-translator-host');
+            if (!host || !host.shadowRoot || host.style.display === 'none') return { ready: false };
+            const body = host.shadowRoot.querySelector('[data-role="body"]');
+            const status = host.shadowRoot.querySelector('[data-role="status"]');
+            const meta = host.shadowRoot.querySelector('[data-role="meta"]');
+            const text = body ? body.textContent.trim() : '';
+            const ready = text && text !== '正在翻译…' && text.indexOf('Hello translator') === -1;
+            return { ready: ready, text: text, status: status ? status.textContent : '', meta: meta ? meta.textContent : '' };
+          })()`,
+          returnByValue: true
+        });
+        if (translated.result && translated.result.value && translated.result.value.ready) break;
+      }
+      const value = translated && translated.result && translated.result.value;
+      if (!value || !value.ready || !/[\u4e00-\u9fff]/.test(value.text)) {
+        throw new Error('e2e translation did not render: ' + JSON.stringify(translated));
+      }
+      process.stdout.write('SMOKE_E2E_OK ' + JSON.stringify({
+        text: value.text.slice(0, 40),
+        meta: value.meta,
+        status: value.status
+      }) + '\n');
     }
     process.stdout.write('SMOKE_INJECT_OK\n');
   } finally {

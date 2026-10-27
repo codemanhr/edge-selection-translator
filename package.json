@@ -12,6 +12,7 @@
     "check": "node --test tests/*.test.js",
     "icons": "node scripts/generate-icons.js",
     "smoke:inject": "node scripts/smoke-inject.js",
+    "smoke:e2e": "node scripts/smoke-inject.js --e2e",
     "smoke:translate": "node scripts/smoke-translate.js",
     "pack": "node scripts/pack.js"
   }

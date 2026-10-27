@@ -6,21 +6,25 @@
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
   'use strict';
 
+  const FALLBACK_LANGUAGES = [
+    { code: 'auto', name: '自动检测' },
+    { code: 'zh-Hans', name: '简体中文' },
+    { code: 'en', name: '英语' }
+  ];
+
   function mountPanel(doc, deps) {
     const ESTNS = (typeof globalThis !== 'undefined' && globalThis.EST) || {};
     const constants = (deps && deps.constants) || ESTNS;
     const cssText = (deps && deps.panelCSS) || ESTNS.panelCSS || '';
     const positionOf = (deps && deps.computePanelPosition) || ESTNS.computePanelPosition;
+    const languages = (deps && deps.languages) || ESTNS.LANGUAGES || FALLBACK_LANGUAGES;
     const hostId = constants.HOST_ID || 'est-selection-translator-host';
     const margin = constants.PANEL_MARGIN || 8;
 
-    let host = doc.getElementById(hostId);
-    if (host && host.shadowRoot) {
-      host.remove();
-      host = null;
-    }
+    const existing = doc.getElementById(hostId);
+    if (existing) existing.remove();
 
-    host = doc.createElement('div');
+    const host = doc.createElement('div');
     host.id = hostId;
     host.setAttribute('data-est-root', 'true');
     host.style.cssText = [
@@ -47,40 +51,93 @@
     panel.setAttribute('aria-label', '划词翻译');
     panel.innerHTML = [
       '<div class="bar">',
-      '  <div class="title">划词翻译</div>',
+      '  <label class="lang"><span>目标</span><select data-role="target" aria-label="目标语言"></select></label>',
+      '  <button type="button" class="swap" data-role="swap" title="交换语言" aria-label="交换语言">⇄</button>',
+      '  <label class="lang"><span>源</span><select data-role="source" aria-label="源语言"></select></label>',
       '  <button type="button" class="close" data-role="close" aria-label="关闭">×</button>',
       '</div>',
+      '<div class="meta" data-role="meta"></div>',
       '<div class="body" data-role="body"></div>',
+      '<div class="original" data-role="original"></div>',
       '<div class="status" data-role="status"></div>'
     ].join('');
     shadow.appendChild(style);
     shadow.appendChild(panel);
 
+    const targetSelect = panel.querySelector('[data-role="target"]');
+    const sourceSelect = panel.querySelector('[data-role="source"]');
     const bodyEl = panel.querySelector('[data-role="body"]');
+    const originalEl = panel.querySelector('[data-role="original"]');
     const statusEl = panel.querySelector('[data-role="status"]');
+    const metaEl = panel.querySelector('[data-role="meta"]');
     const closeBtn = panel.querySelector('[data-role="close"]');
+    const swapBtn = panel.querySelector('[data-role="swap"]');
+
+    function fillSelect(select, includeAuto, selected) {
+      select.textContent = '';
+      languages.forEach(function (lang) {
+        if (!includeAuto && lang.code === 'auto') return;
+        const option = doc.createElement('option');
+        option.value = lang.code;
+        option.textContent = lang.name;
+        if (lang.code === selected) option.selected = true;
+        select.appendChild(option);
+      });
+    }
+
+    fillSelect(targetSelect, false, 'zh-Hans');
+    fillSelect(sourceSelect, true, 'auto');
 
     let open = false;
     let currentText = '';
+    let detected = '';
+    let engineName = '';
+    let handlers = {
+      onLanguageChange: function () {},
+      onSwap: function () {}
+    };
 
     function place(point) {
       const rect = panel.getBoundingClientRect();
-      const viewport = {
-        width: doc.defaultView ? doc.defaultView.innerWidth : 800,
-        height: doc.defaultView ? doc.defaultView.innerHeight : 600
-      };
+      const view = doc.defaultView || { innerWidth: 800, innerHeight: 600 };
       const pos = positionOf
-        ? positionOf(point, { width: rect.width || 300, height: rect.height || 80 }, viewport, margin)
+        ? positionOf(
+          point,
+          { width: rect.width || 312, height: rect.height || 120 },
+          { width: view.innerWidth, height: view.innerHeight },
+          margin
+        )
         : { left: point.x + margin, top: point.y + margin };
       host.style.left = pos.left + 'px';
       host.style.top = pos.top + 'px';
     }
 
+    function renderMeta() {
+      const parts = [];
+      if (engineName) parts.push(engineName);
+      const source = sourceSelect.value;
+      if (source === 'auto' && detected) parts.push('检测到' + (ESTNS.languageName ? ESTNS.languageName(detected) : detected));
+      else if (source !== 'auto') parts.push(ESTNS.languageName ? ESTNS.languageName(source) : source);
+      metaEl.textContent = parts.join(' · ');
+    }
+
     function openPanel(options) {
       const point = options || { x: margin, y: margin };
-      currentText = options.text || '';
-      bodyEl.textContent = currentText;
+      if (options.original != null) currentText = options.original;
+      if (options.detected != null) detected = options.detected || '';
+      if (options.engineLabel != null) engineName = options.engineLabel || '';
+      if (options.sourceLang) sourceSelect.value = options.sourceLang;
+      if (options.targetLang) targetSelect.value = options.targetLang;
+      originalEl.textContent = currentText;
+      if (options.loading) {
+        bodyEl.textContent = '正在翻译…';
+        bodyEl.classList.add('loading');
+      } else {
+        bodyEl.textContent = options.translated || '';
+        bodyEl.classList.remove('loading');
+      }
       statusEl.textContent = options.status || '';
+      renderMeta();
       host.style.display = 'block';
       host.style.pointerEvents = 'none';
       panel.style.pointerEvents = 'auto';
@@ -92,9 +149,18 @@
     function closePanel() {
       open = false;
       currentText = '';
+      detected = '';
+      engineName = '';
       host.style.display = 'none';
       bodyEl.textContent = '';
+      originalEl.textContent = '';
       statusEl.textContent = '';
+      metaEl.textContent = '';
+    }
+
+    function move(x, y) {
+      if (!open) return;
+      place({ x: x, y: y });
     }
 
     closeBtn.addEventListener('click', function (event) {
@@ -102,22 +168,45 @@
       event.stopPropagation();
       closePanel();
     });
+    swapBtn.addEventListener('click', function (event) {
+      event.preventDefault();
+      event.stopPropagation();
+      handlers.onSwap();
+    });
+    targetSelect.addEventListener('change', function () { handlers.onLanguageChange(); });
+    sourceSelect.addEventListener('change', function () { handlers.onLanguageChange(); });
 
-    const parent = doc.documentElement || doc.body;
-    parent.appendChild(host);
+    (doc.documentElement || doc.body).appendChild(host);
 
     return {
       host: host,
       open: openPanel,
       close: closePanel,
+      move: move,
       isOpen: function () { return open; },
       getText: function () { return currentText; },
+      getDetected: function () { return detected; },
+      getChoice: function () {
+        return { source: sourceSelect.value || 'auto', target: targetSelect.value || 'zh-Hans' };
+      },
+      setChoice: function (source, target) {
+        if (source) sourceSelect.value = source;
+        if (target) targetSelect.value = target;
+        renderMeta();
+      },
+      setHandlers: function (next) {
+        handlers = {
+          onLanguageChange: (next && next.onLanguageChange) || function () {},
+          onSwap: (next && next.onSwap) || function () {}
+        };
+      },
       isEventInside: function (event) {
-        if (!event || typeof event.composedPath !== 'function') {
-          return event && event.target === host;
+        if (!event) return false;
+        if (typeof event.composedPath === 'function') {
+          const path = event.composedPath();
+          return path.indexOf(host) !== -1 || path.indexOf(panel) !== -1;
         }
-        const path = event.composedPath();
-        return path.indexOf(host) !== -1 || path.indexOf(panel) !== -1;
+        return event.target === host;
       }
     };
   }

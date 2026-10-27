@@ -5,6 +5,11 @@
   "description": "选中网页文字，在光标旁显示翻译。Translate selected text in a compact panel beside the cursor.",
   "author": "codemanhr",
   "minimum_chrome_version": "109",
+  "host_permissions": [
+    "https://www.bing.com/*",
+    "https://translate.googleapis.com/*",
+    "https://api.mymemory.translated.net/*"
+  ],
   "action": {
     "default_title": "划词翻译",
     "default_icon": {
@@ -28,6 +33,9 @@
       "matches": ["http://*/*", "https://*/*"],
       "js": [
         "src/lib/constants.js",
+        "src/lib/languages.js",
+        "src/lib/detect.js",
+        "src/lib/direction.js",
         "src/lib/panel-logic.js",
         "src/lib/position.js",
         "src/content/panel.css.js",
