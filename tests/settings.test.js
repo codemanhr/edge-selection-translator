@@ -42,6 +42,22 @@ test('settings round-trip keeps unrelated fields and honors the enabled toggle',
   assert.equal(mergeSettings({ style: 'nope' }).style, 'normal');
 });
 
+test('missing engine defaults to MyMemory and a stored engine is kept', async function () {
+  assert.equal(mergeSettings(null).engine, 'mymemory');
+  assert.equal(mergeSettings({}).engine, 'mymemory');
+  assert.equal(mergeSettings({ engine: '' }).engine, 'mymemory');
+  assert.equal(mergeSettings({ engine: 'bing' }).engine, 'bing');
+  assert.equal(mergeSettings({ engine: 'google' }).engine, 'google');
+
+  const storage = createMemoryStorage({
+    estSettings: mergeSettings({ engine: 'bing', targetLang: 'ja' })
+  });
+  const kept = await saveSettings(storage, { enabled: false });
+  assert.equal(kept.engine, 'bing');
+  assert.equal(kept.targetLang, 'ja');
+  assert.equal((await loadSettings(storage)).engine, 'bing');
+});
+
 test('copy uses the clipboard API and falls back to execCommand', async function () {
   let written = '';
   const viaClipboard = await copyText('你好', {

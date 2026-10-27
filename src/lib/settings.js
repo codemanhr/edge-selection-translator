@@ -7,8 +7,8 @@
   'use strict';
 
   const STORAGE_KEY = 'estSettings';
-  const FREE_ENGINES = ['bing', 'google', 'mymemory'];
-  const ENGINES = ['bing', 'google', 'mymemory', 'deepl', 'openai', 'libretranslate', 'azure'];
+  const FREE_ENGINES = ['mymemory', 'google', 'bing'];
+  const ENGINES = ['mymemory', 'google', 'bing', 'deepl', 'openai', 'libretranslate', 'azure'];
   const STYLES = ['normal', 'colloquial', 'formal'];
 
   const DEFAULT_API = {
@@ -30,7 +30,7 @@
   function mergeSettings(partial) {
     const src = partial && typeof partial === 'object' ? partial : {};
     const style = STYLES.indexOf(src.style) === -1 ? 'normal' : src.style;
-    const engine = typeof src.engine === 'string' && src.engine ? src.engine : 'bing';
+    const engine = typeof src.engine === 'string' && src.engine ? src.engine : 'mymemory';
     return {
       enabled: src.enabled !== false,
       sourceLang: src.sourceLang || 'auto',

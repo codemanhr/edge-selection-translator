@@ -31,7 +31,7 @@
 
 扩展会在本地判断原文语言，并提供一键对调。译文可以复制，也可以用浏览器自带的语音合成朗读原文或译文。Alt+T 强制翻译当前选区，Alt+Shift+T 打开或关闭划词翻译。工具栏图标提供快捷开关、目标语言和引擎；完整选项页可以调整语气、外观、黑名单、历史和收藏。
 
-默认引擎是无需密钥的 Bing 翻译。如果它暂时不可用，会自动改用 Google 翻译或 MyMemory，并在面板里说明。你也可以填入自己的 DeepL、OpenAI 兼容接口、LibreTranslate 或 Azure 翻译密钥。密钥只保存在这台设备的扩展存储里，不会上传到扩展作者的服务器。语气可选普通、更口语或更正式：DeepL 和 OpenAI 兼容接口会按语气翻译，其他引擎会注明仍按普通风格处理。网址、邮箱、全大写缩写和连续的英文专名可以尽量保持原样。
+默认引擎是无需密钥的 MyMemory。如果它暂时不可用，会依次改用 Google 翻译、Bing 翻译，并在面板里说明。你也可以填入自己的 DeepL、OpenAI 兼容接口、LibreTranslate 或 Azure 翻译密钥。密钥只保存在这台设备的扩展存储里，不会上传到扩展作者的服务器。语气可选普通、更口语或更正式：DeepL 和 OpenAI 兼容接口会按语气翻译，其他引擎会注明仍按普通风格处理。网址、邮箱、全大写缩写和连续的英文专名可以尽量保持原样。
 
 代码块、常见代码编辑器和密码框里的选区不会被翻译。你可以把某个网站加入黑名单。最近的翻译和收藏都留在本机。界面跟随系统的深色或浅色外观，面板半透明。
 
@@ -45,7 +45,7 @@ Selection Translator shows a translation beside the cursor when you select text 
 
 The extension detects the source language on your device and can swap the language pair in one click. Copy the translation, or speak the original and the translation with the browser speech API. Alt+T forces a translation of the current selection. Alt+Shift+T turns selection translation on or off. The toolbar icon changes the switch, the target language, and the engine. The options page also sets tone, theme, the site blacklist, history, and favorites.
 
-The default engine is Bing Translator and needs no key. If it is unavailable, the extension tries Google Translate and then MyMemory, and the panel names the engine that answered. You can store your own DeepL, OpenAI-compatible, LibreTranslate, or Azure Translator key. Keys stay in extension storage on this device and are not uploaded to the author. Tone can be neutral, more colloquial, or more formal. DeepL and OpenAI-compatible endpoints apply the tone. The other engines say they translated in a neutral tone. URLs, email addresses, acronyms, and multi-word proper names can be left unchanged.
+The default engine is MyMemory and needs no key. If it is unavailable, the extension tries Google Translate and then Bing Translator, and the panel names the engine that answered. You can store your own DeepL, OpenAI-compatible, LibreTranslate, or Azure Translator key. Keys stay in extension storage on this device and are not uploaded to the author. Tone can be neutral, more colloquial, or more formal. DeepL and OpenAI-compatible endpoints apply the tone. The other engines say they translated in a neutral tone. URLs, email addresses, acronyms, and multi-word proper names can be left unchanged.
 
 Selections inside code blocks, common code editors, and password fields are not translated. You can skip a whole site. Recent translations and favorites remain on the device. The panel follows the system light or dark theme.
 

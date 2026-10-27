@@ -25,9 +25,9 @@
   let ready = false;
 
   const HINTS = {
-    bing: '默认引擎。读取 Bing 翻译页面上的短期令牌，无需密钥。选中的文字会发送到 Microsoft。接口可能调整；失败时会自动改用其他免密钥引擎。',
+    bing: '读取 Bing 翻译页面上的短期令牌，无需密钥。选中的文字会发送到 Microsoft。接口可能调整。',
     google: 'Google 的非官方翻译接口，无需密钥，也没有可用性保证，可能会被限流。选中的文字会发送到 Google。',
-    mymemory: '匿名额度较小，单段大约 450 字。选中的文字会发送到 Translated（MyMemory）。'
+    mymemory: '默认引擎，无需密钥。匿名额度较小，单段大约 450 字。选中的文字会发送到 Translated（MyMemory）。失败时会依次改用 Google、Bing。'
   };
 
   function fillLanguages(select, includeAuto, selected) {
@@ -117,7 +117,7 @@
     enabledInput.checked = settings.enabled !== false;
     fillLanguages(sourceSelect, true, settings.sourceLang || 'auto');
     fillLanguages(targetSelect, false, settings.targetLang || 'zh-Hans');
-    engineSelect.value = ESTNS.ENGINES.indexOf(settings.engine) === -1 ? 'bing' : settings.engine;
+    engineSelect.value = ESTNS.ENGINES.indexOf(settings.engine) === -1 ? 'mymemory' : settings.engine;
     styleSelect.value = settings.style || 'normal';
     themeSelect.value = settings.theme || 'system';
     namesInput.checked = settings.keepProperNouns !== false;

@@ -63,7 +63,7 @@ test('DeepL formal mode sends formality and a missing key falls back', async fun
   assert.equal(formal.translatedText, 'Hallo');
   assert.match(String(body), /formality=prefer_more/);
   assert.match(String(body), /target_lang=DE/);
-  assert.deepEqual(chainFor('deepl'), ['deepl', 'bing', 'google', 'mymemory']);
+  assert.deepEqual(chainFor('deepl'), ['deepl', 'mymemory', 'google', 'bing']);
 
   const fallback = await translateText({
     text: 'Hello secret',

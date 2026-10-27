@@ -134,7 +134,10 @@ test('router falls through a failing engine and keeps the token cache', async fu
   assert.equal(result.fallback, true);
   assert.match(result.note, /Google/);
   assert.equal(bingPageReads, 1);
-  assert.deepEqual(chainFor('google'), ['google', 'bing', 'mymemory']);
+  assert.deepEqual(chainFor('google'), ['google', 'mymemory', 'bing']);
+  assert.deepEqual(chainFor('bing'), ['bing', 'mymemory', 'google']);
+  assert.deepEqual(chainFor('mymemory'), ['mymemory', 'google', 'bing']);
+  assert.deepEqual(chainFor(''), ['mymemory', 'google', 'bing']);
 });
 
 test('same-language Chinese is redirected to English before the request', async function () {

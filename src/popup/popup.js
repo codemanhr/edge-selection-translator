@@ -28,7 +28,7 @@
     ready = false;
     enabledInput.checked = settings.enabled !== false;
     fillTargets(settings.targetLang);
-    engineSelect.value = ESTNS.ENGINES.indexOf(settings.engine) === -1 ? 'bing' : settings.engine;
+    engineSelect.value = ESTNS.ENGINES.indexOf(settings.engine) === -1 ? 'mymemory' : settings.engine;
     const recent = document.getElementById('recent');
     recent.textContent = '';
     (settings.history || []).slice(0, 3).forEach(function (entry) {

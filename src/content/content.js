@@ -25,7 +25,7 @@
       blacklisted: ESTNS.isBlacklisted
         ? ESTNS.isBlacklisted(cached.blacklist || [], location.hostname)
         : false,
-      engine: cached.engine || 'bing',
+      engine: cached.engine || 'mymemory',
       sourceLang: cached.sourceLang,
       targetLang: cached.targetLang,
       style: cached.style || 'normal',

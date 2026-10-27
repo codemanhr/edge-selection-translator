@@ -29,15 +29,15 @@
 
 | 引擎 | 请求发往 | 是否需要密钥 |
 | --- | --- | --- |
-| Bing 翻译（默认） | `https://www.bing.com/translator` 与 `https://www.bing.com/ttranslatev3`（Microsoft） | 否 |
+| MyMemory（默认） | `https://api.mymemory.translated.net/get`（Translated） | 否 |
 | Google 翻译 | `https://translate.googleapis.com/translate_a/single`（Google，非官方接口） | 否 |
-| MyMemory | `https://api.mymemory.translated.net/get`（Translated） | 否 |
+| Bing 翻译 | `https://www.bing.com/translator` 与 `https://www.bing.com/ttranslatev3`（Microsoft） | 否 |
 | DeepL | `https://api-free.deepl.com` 或 `https://api.deepl.com` | 是，密钥只存在本机 |
 | OpenAI 兼容 | 你填写的地址，默认 `https://api.openai.com/v1/chat/completions` | 是，密钥只存在本机 |
 | LibreTranslate | 你填写的地址，默认 `https://libretranslate.com/translate` | 视该实例而定，密钥只存在本机 |
 | Azure 翻译 | `https://api.cognitive.microsofttranslator.com/translate`（Microsoft） | 是，密钥只存在本机 |
 
-首选引擎失败时，扩展会改用免密钥引擎（Bing、Google、MyMemory）并在面板上说明。此时文字会发给实际完成翻译的那一家。
+首选引擎失败时，扩展会按 MyMemory、Google、Bing 的顺序改用其余免密钥引擎，并在面板上说明。此时文字会发给实际完成翻译的那一家。
 
 各引擎对数据的保存期限和用途以其自身的隐私政策为准。本扩展不能控制它们。
 
@@ -76,15 +76,15 @@ The extension reads text only when you select it, or when you force a translatio
 
 Selected text is sent only to the translation engine you pick:
 
-- Bing Translator (default), no key: `https://www.bing.com/translator` and `https://www.bing.com/ttranslatev3`
+- MyMemory (default), no key: `https://api.mymemory.translated.net/get`
 - Google Translate, no key, unofficial: `https://translate.googleapis.com/translate_a/single`
-- MyMemory, no key: `https://api.mymemory.translated.net/get`
+- Bing Translator, no key: `https://www.bing.com/translator` and `https://www.bing.com/ttranslatev3`
 - DeepL, your key, stored locally: `https://api-free.deepl.com` or `https://api.deepl.com`
 - An OpenAI-compatible chat API, your key, stored locally: the base URL you enter, default `https://api.openai.com/v1/chat/completions`
 - LibreTranslate, optional key, stored locally: the URL you enter, default `https://libretranslate.com/translate`
 - Azure Translator, your key, stored locally: `https://api.cognitive.microsofttranslator.com/translate`
 
-If the preferred engine fails, the extension tries the free engines and tells you which one answered. Those providers' own privacy policies govern what they do with the text. This extension does not.
+If the preferred engine fails, the extension tries the remaining free engines in the order MyMemory, Google, then Bing, and tells you which one answered. Those providers' own privacy policies govern what they do with the text. This extension does not.
 
 API keys stay in extension storage on the device. They are attached only to the request for that provider. Error text does not include the key or the source sentence.
 

@@ -23,7 +23,7 @@ Chrome 用 `chrome://extensions`，其余相同。
 - 工具栏弹窗和选项页可改开关、语言、引擎、语气、深浅色和密钥。
 - 最近约 50 条翻译、约 100 条收藏，存在本机。
 - 可以按网站停用。`pre`、`code` 以及常见代码编辑器里的选区不翻译，密码框也不读取。
-- 默认引擎是 Bing，不用密钥。不可用时改用 Google 或 MyMemory，面板会写明当前用的是哪一个。这几个免密钥接口是公开服务，可能会调整或限流。DeepL、OpenAI 兼容接口、LibreTranslate、Azure 在选项页填写密钥，密钥只保存在本机；没填或失败时退回免密钥引擎。
+- 默认引擎是 MyMemory，不用密钥。不可用时依次改用 Google、Bing，面板会写明当前用的是哪一个。这几个免密钥接口是公开服务，可能会调整或限流。DeepL、OpenAI 兼容接口、LibreTranslate、Azure 在选项页填写密钥，密钥只保存在本机；没填或失败时退回免密钥引擎。
 - 语气可选普通、更口语或更正式。DeepL 和 OpenAI 兼容接口会照此翻译，其他引擎会说明仍按普通风格。
 - 可选：网址、邮箱、全大写缩写和连续的英文专名保持原文。
 - 面板跟随系统深色或浅色，也可以在选项里固定。
@@ -40,7 +40,7 @@ Open `edge://extensions`, turn on Developer mode, and choose Load unpacked. Pick
 
 Target language sits at the top of the panel. Source language is detected, and the pair can be swapped. Copy or speak the result. `Alt+T` translates the selection even when the feature is off; `Alt+Shift+T` toggles it. On the options page, Shortcut display only changes the labels (`Alt+T` or macOS `⌥T` / `⌥⇧T`). The registered command stays Alt, which is Option on a Mac.
 
-Bing is the default and needs no key. Google and MyMemory are the fallbacks. These free endpoints are public and may change or rate-limit. DeepL, OpenAI-compatible APIs, LibreTranslate, and Azure use a key stored on the device. Tone (neutral, colloquial, formal) is applied by DeepL and OpenAI-compatible APIs. History, favorites, a per-site block list, and skipping code and password fields are included. The panel follows the system theme.
+MyMemory is the default and needs no key. If it fails, Google is next and then Bing. These free endpoints are public and may change or rate-limit. DeepL, OpenAI-compatible APIs, LibreTranslate, and Azure use a key stored on the device. Tone (neutral, colloquial, formal) is applied by DeepL and OpenAI-compatible APIs. History, favorites, a per-site block list, and skipping code and password fields are included. The panel follows the system theme.
 
 See [privacy-policy.md](privacy-policy.md).
 

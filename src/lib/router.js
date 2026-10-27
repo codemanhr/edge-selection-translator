@@ -6,7 +6,7 @@
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
   'use strict';
 
-  const FREE_CHAIN = ['bing', 'google', 'mymemory'];
+  const FREE_CHAIN = ['mymemory', 'google', 'bing'];
   const KEYED_ENGINES = ['deepl', 'openai', 'libretranslate', 'azure'];
 
   function lib(file) {
@@ -21,14 +21,14 @@
   }
 
   function chainFor(engine) {
-    const requested = engine || 'bing';
+    const requested = engine || 'mymemory';
     if (FREE_CHAIN.indexOf(requested) !== -1) {
       return [requested].concat(FREE_CHAIN.filter(function (name) { return name !== requested; }));
     }
     if (KEYED_ENGINES.indexOf(requested) !== -1) {
       return [requested].concat(FREE_CHAIN);
     }
-    return ['bing'].concat(FREE_CHAIN.filter(function (name) { return name !== 'bing'; }));
+    return FREE_CHAIN.slice();
   }
 
   function nounTools() {
@@ -46,7 +46,7 @@
 
     const sourceLang = (request && request.sourceLang) || 'auto';
     const targetLang = (request && request.targetLang) || 'zh-Hans';
-    const preferred = (request && request.engine) || 'bing';
+    const preferred = (request && request.engine) || 'mymemory';
     const detectedLocal = sourceLang === 'auto' ? detect.detectLanguage(sourceText) : sourceLang;
     const direction = directionApi.resolveDirection({
       sourceLang: sourceLang,
