@@ -10,7 +10,7 @@ Later stages are not started until the previous stage is green.
 | C. Copy, TTS, shortcuts, options | PASS | 2026-10-27 |
 | D. History, favorites, blacklist, code skip | PASS | 2026-10-27 |
 | E. Engines, style, dark UI | PASS | 2026-10-27 |
-| F. Store docs and hygiene | pending | |
+| F. Store docs and hygiene | PASS | 2026-10-27 |
 
 ## Stage A — MV3 scaffold
 
@@ -130,3 +130,36 @@ Checks:
 - `npm run smoke:e2e` — `SMOKE_E2E_OK` and `SMOKE_INJECT_OK`, exit 0, after the style control, theme class, and optional host permissions were added. Headless Chrome still falls back from Bing to Google, as in stage B
 
 Not in this stage: privacy policy, store listing, bilingual README.
+
+## Stage F — Store docs and hygiene
+
+Status: PASS (2026-10-27)
+
+What shipped:
+
+- `privacy-policy.md` and a GitHub Pages page at `docs/privacy-policy.html`: selected text, each engine endpoint, keys only in `chrome.storage.local`, no sale, telemetry none by default
+- README in Chinese and English: Load unpacked, features, a permission table, and the Partner Center checklist
+- `STORE_LISTING.md`: store name 划词翻译, the manifest short description, zh-CN and English long descriptions, category Productivity, privacy disclosure aligned with the policy
+- Icons 16/32/48/128. `scripts/pack.js` writes `dist/edge-selection-translator.zip` with `manifest.json`, `icons/`, and `src/` only. `.gitignore` already excludes `node_modules/`, `dist/`, zip packages, and Chrome profiles
+- Fixture screenshots at `docs/screenshots/` (1280×800). They come from headless Chrome; replace them with Edge captures before store submission
+
+Checks:
+
+- `npm test` — 40 passed, 0 failed, including the docs, icon, and zip checks
+- `npm run pack` — `PACK_OK`, zip starts with `PK`, includes the manifest and content script, and excludes `tests/` and `README.md`
+- `node scripts/capture-ui.js` — `CAPTURE_OK`. `panel.png`, `options.png`, and `popup.png` are 1280×800 PNGs
+- Runtime code did not change in this stage. The stage E `npm run smoke:e2e` result still covers the panel
+
+## Final checklist
+
+| Item | Result |
+| --- | --- |
+| Manifest V3, local CSP, no remote scripts | PASS |
+| Selection panel, dismiss, target language, detect, swap | PASS |
+| Copy, speech, Alt+T, Alt+Shift+T, popup, options | PASS |
+| History, favorites, blacklist, code skip | PASS |
+| Free and keyed engines, style, proper nouns, dark UI | PASS |
+| Privacy policy, store listing, bilingual README, icons, pack | PASS |
+| `npm test` | PASS, 40 tests |
+| Load unpacked in a normal Edge window | Needs a person |
+| Partner Center account, GitHub Pages, store screenshots, API keys | Needs a person |

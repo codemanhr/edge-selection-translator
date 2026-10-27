@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>划词翻译隐私政策 · Selection Translator</title>
+  <style>
+    :root { color-scheme: light dark; --ink: #172033; --muted: #5c6b80; --line: #d7e0ec; --bg: #f6f8fb; --card: #fff; }
+    @media (prefers-color-scheme: dark) {
+      :root { --ink: #f3f4f6; --muted: #b7c0cc; --line: #2c3644; --bg: #10141b; --card: #1a212c; }
+    }
+    body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.6 "Segoe UI", "PingFang SC", sans-serif; }
+    main { max-width: 760px; margin: 0 auto; padding: 32px 20px 72px; }
+    h1 { font-size: 32px; line-height: 1.25; margin-bottom: 8px; }
+    h2 { font-size: 22px; margin-top: 32px; }
+    .date, .note { color: var(--muted); }
+    table { width: 100%; border-collapse: collapse; background: var(--card); }
+    th, td { border: 1px solid var(--line); padding: 8px 10px; text-align: left; vertical-align: top; }
+    code { font-family: ui-monospace, Consolas, monospace; font-size: 0.92em; }
+    a { color: #0f6cbd; }
+  </style>
+</head>
+<body>
+<main>
+  <p class="date">生效日期 Effective date：2026-10-27</p>
+  <h1>划词翻译隐私政策</h1>
+  <p>本页说明 Microsoft Edge 扩展「划词翻译」（Selection Translator）如何处理数据。扩展在你的浏览器里运行。作者没有自己的服务器，扩展不会把选中的文字或译文发到作者的服务器。</p>
+
+  <h2>扩展处理哪些数据</h2>
+  <p>扩展只在你主动划选文字，或使用强制翻译（快捷键、右键菜单）时读取当前选区的文本。</p>
+  <p>本地保存在 <code>chrome.storage.local</code>（键名 <code>estSettings</code>）里的内容包括：开关、语言、引擎、语气、主题、是否保留专名；你填写的 API 密钥；最近约 50 条翻译和最多约 100 条收藏；黑名单网站的主机名。扩展不使用 <code>chrome.storage.sync</code>。</p>
+
+  <h2>选中的文字会发给谁</h2>
+  <p>翻译请求由扩展自己的后台脚本发出。选中的文字和语言代码会发送到你当前选择的翻译引擎。DeepL 与 OpenAI 兼容接口还会带上语气要求。启用「尽量不翻译专名」时，网址、邮箱、全大写缩写和连续首字母大写的专名会先换成占位符。扩展作者不接收、不记录这些请求。</p>
+  <table>
+    <thead><tr><th>引擎</th><th>请求发往</th><th>密钥</th></tr></thead>
+    <tbody>
+      <tr><td>Bing 翻译（默认）</td><td><code>https://www.bing.com/translator</code> 与 <code>https://www.bing.com/ttranslatev3</code></td><td>不需要</td></tr>
+      <tr><td>Google 翻译</td><td><code>https://translate.googleapis.com/translate_a/single</code>（非官方接口）</td><td>不需要</td></tr>
+      <tr><td>MyMemory</td><td><code>https://api.mymemory.translated.net/get</code></td><td>不需要</td></tr>
+      <tr><td>DeepL</td><td><code>https://api-free.deepl.com</code> 或 <code>https://api.deepl.com</code></td><td>只存在本机</td></tr>
+      <tr><td>OpenAI 兼容</td><td>你填写的地址，默认 <code>https://api.openai.com/v1/chat/completions</code></td><td>只存在本机</td></tr>
+      <tr><td>LibreTranslate</td><td>你填写的地址，默认 <code>https://libretranslate.com/translate</code></td><td>可选，只存在本机</td></tr>
+      <tr><td>Azure 翻译</td><td><code>https://api.cognitive.microsofttranslator.com/translate</code></td><td>只存在本机</td></tr>
+    </tbody>
+  </table>
+  <p>首选引擎失败时，扩展会改用免密钥引擎，并在面板上说明实际使用的是哪一个。各引擎如何保存文字，以其自己的隐私政策为准。</p>
+
+  <h2>不出售数据，默认没有遥测</h2>
+  <ul>
+    <li>作者不出售、不出租、不交换选区、译文、历史、收藏或密钥。</li>
+    <li>默认没有遥测：没有分析脚本，没有广告，也没有可开启的遥测开关。</li>
+    <li>密码框中的文字不会读取。代码块和常见代码编辑器中的选区不会送去翻译。</li>
+  </ul>
+  <p>卸载扩展会删除浏览器为它保存的本地数据。选项页也可以清空历史、收藏和密钥。</p>
+  <p>联系：<a href="https://github.com/codemanhr/edge-selection-translator/issues">GitHub Issues</a></p>
+
+  <h2 id="english">English</h2>
+  <p>Selection Translator runs in your browser. The author runs no server for this extension. Selected text and translations are not sent to the author.</p>
+  <p>The extension reads text when you select it or force a translation. Settings, API keys, recent translations, favorites, and blacklisted hostnames stay in <code>chrome.storage.local</code> under <code>estSettings</code>. Nothing is written to <code>chrome.storage.sync</code>.</p>
+  <p>Selected text is sent only to the engine you choose: Bing (<code>www.bing.com</code>), Google (<code>translate.googleapis.com</code>), MyMemory (<code>api.mymemory.translated.net</code>), DeepL (<code>api-free.deepl.com</code> or <code>api.deepl.com</code>), an OpenAI-compatible URL you enter (default <code>api.openai.com</code>), LibreTranslate (default <code>libretranslate.com</code>), or Azure Translator (<code>api.cognitive.microsofttranslator.com</code>). API keys remain on the device and are attached only to that provider's request.</p>
+  <p>The author does not sell, rent, or trade this data. Telemetry is none by default. Uninstall the extension to delete its local storage.</p>
+</main>
+</body>
+</html>
