@@ -62,11 +62,19 @@ test('shortcut display is stored with settings and manifest bindings stay Alt', 
   assert.equal(manifest.commands['force-translate'].suggested_key.default, 'Alt+T');
   assert.equal(manifest.commands['toggle-enabled'].suggested_key.default, 'Alt+Shift+T');
   assert.equal(COMMANDS['force-translate'].suggestedKey, 'Alt+T');
-  ['src/options/options.html', 'src/popup/popup.html'].forEach(function (file) {
-    const html = fs.readFileSync(path.join(root, file), 'utf8');
-    assert.match(html, /id="shortcut-display"/);
-    assert.match(html, /shortcuts\.js/);
-    assert.match(html, /Windows \/ Linux/);
-    assert.match(html, /macOS/);
-  });
+
+  const options = fs.readFileSync(path.join(root, 'src/options/options.html'), 'utf8');
+  const optionsJs = fs.readFileSync(path.join(root, 'src/options/options.js'), 'utf8');
+  assert.match(options, /id="shortcut-display"/);
+  assert.match(options, /shortcuts\.js/);
+  assert.match(options, /Windows \/ Linux/);
+  assert.match(options, /macOS/);
+  assert.match(optionsJs, /paintShortcuts/);
+  assert.match(optionsJs, /detectShortcutPlatform/);
+  assert.match(optionsJs, /shortcutDisplay/);
+
+  const popup = fs.readFileSync(path.join(root, 'src/popup/popup.html'), 'utf8');
+  const popupJs = fs.readFileSync(path.join(root, 'src/popup/popup.js'), 'utf8');
+  assert.equal(/shortcut-display|快捷键显示|shortcuts\.js/.test(popup), false);
+  assert.equal(/shortcutDisplay|paintShortcuts|detectShortcutPlatform/.test(popupJs), false);
 });
