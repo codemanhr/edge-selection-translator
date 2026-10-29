@@ -76,6 +76,24 @@ function keepWorkerAlive() {
   return function () { clearInterval(timer); };
 }
 
+// The ping is what wakes a stopped worker. Hold it open long enough for the
+// content script to send the translation on the next turn. Without this, Edge
+// can suspend the worker again before that message is delivered — the usual
+// failure on the second page, after the first translation's keepalive ended.
+const FOLLOW_UP_MS = 15000;
+let releasePingHold = null;
+let pingHoldTimer = null;
+function holdWorkerForFollowUp() {
+  if (!releasePingHold) releasePingHold = keepWorkerAlive();
+  if (pingHoldTimer) clearTimeout(pingHoldTimer);
+  pingHoldTimer = setTimeout(function () {
+    pingHoldTimer = null;
+    const release = releasePingHold;
+    releasePingHold = null;
+    if (release) release();
+  }, FOLLOW_UP_MS);
+}
+
 chrome.runtime.onConnect.addListener(function (port) {
   if (!port || !port.name) return;
   if (port.name === 'est-keepalive') {
@@ -98,6 +116,7 @@ chrome.runtime.onConnect.addListener(function (port) {
 chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
   if (!message || !message.type) return undefined;
   if (message.type === 'est-ping') {
+    holdWorkerForFollowUp();
     sendResponse({ ok: true });
     return undefined;
   }

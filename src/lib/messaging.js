@@ -78,35 +78,89 @@
     return steps[index] || 4000;
   }
 
-  // Callback form. `done` runs when the ping has been answered or has thrown
-  // a non-fatal error. Invalidation is rethrown. Calling done in the same
-  // turn as sendMessage is required so the caller can wait until Edge has
-  // actually started the worker before opening another channel.
+  // `done()` with no error only when the worker actually answered. Edge drops
+  // the first message to a stopped worker and still runs the callback with
+  // lastError set and no response. Treating that as a wake sends the
+  // translation into a worker that is not listening yet.
   function wakeExtensionWorker(runtime, done) {
     function finish(err) {
       if (typeof done === 'function') done(err);
     }
     if (!runtime || typeof runtime.sendMessage !== 'function') {
-      finish();
+      finish(new Error(MESSAGE_UNREACHABLE));
       return;
     }
     try {
-      runtime.sendMessage({ type: 'est-ping' }, function () {
+      runtime.sendMessage({ type: 'est-ping' }, function (response) {
         let last;
         try { last = runtime.lastError; } catch (err) {
-          finish(isContextInvalidated(err) ? rejectError(err) : undefined);
+          finish(isContextInvalidated(err) ? rejectError(err) : new Error(MESSAGE_UNREACHABLE));
           return;
         }
         if (last && isContextInvalidated(last.message || last)) {
           finish(new Error(last.message || String(last)));
           return;
         }
-        finish();
+        // A real response wins over a stale or cross-frame lastError.
+        if (response !== undefined && response !== null) {
+          finish();
+          return;
+        }
+        const text = last && (last.message || String(last));
+        finish(new Error(text || 'Could not establish connection. Receiving end does not exist.'));
       });
     } catch (err) {
       if (isContextInvalidated(err)) throw rejectError(err);
-      finish();
+      finish(rejectError(err));
     }
+  }
+
+  // Retry the ping until the worker answers. The payload must not be sent
+  // from the timeout: that timer only means the ping was not answered.
+  function proveWorkerAwake(runtime, options) {
+    const limit = options && options.attempts ? options.attempts : DEFAULT_ATTEMPTS;
+    const delay = options && options.delay
+      ? options.delay
+      : function (ms, done) { setTimeout(done, ms); };
+    const wakeMs = options && options.wakeMs != null ? options.wakeMs : WAKE_MS;
+    return new Promise(function (resolve, reject) {
+      function attempt(index) {
+        let settled = false;
+        let timer = null;
+        function finish(err) {
+          if (settled) return;
+          settled = true;
+          if (timer != null) {
+            clearTimeout(timer);
+            timer = null;
+          }
+          if (!err) {
+            resolve(true);
+            return;
+          }
+          const wrapped = rejectError(err);
+          if (isContextInvalidated(wrapped)) {
+            reject(wrapped);
+            return;
+          }
+          if (index + 1 < limit && (isRetryableConnectionError(wrapped) || connectionFailure(wrapped))) {
+            delay(retryDelayMs(index), function () { attempt(index + 1); });
+            return;
+          }
+          reject(wrapped);
+        }
+        timer = setTimeout(function () {
+          timer = null;
+          finish(new Error('Could not establish connection. Receiving end does not exist.'));
+        }, wakeMs);
+        try {
+          wakeExtensionWorker(runtime, function (err) { finish(err || null); });
+        } catch (err) {
+          finish(err);
+        }
+      }
+      attempt(0);
+    });
   }
 
   function resultBody(response) {
@@ -218,12 +272,19 @@
       return Promise.reject(new Error(MESSAGE_UNREACHABLE));
     }
     // Edge does not wake an inactive worker on runtime.connect, and a port
-    // opened in the same turn as the wake ping is disconnected. Deliver the
-    // translation with callback sendMessage after the ping returns. The port
-    // is only a fallback when sendMessage is missing or every attempt fails.
+    // opened in the same turn as an unanswered ping is disconnected. Ping
+    // until the worker answers, then send the translation on a later turn.
+    // The port is only a fallback after a proven wake whose sendMessage
+    // still fails (a live worker, a broken callback channel).
     if (typeof runtime.sendMessage === 'function') {
-      return sendViaCallback(message, runtime, { limit: limit, delay: delay }).catch(function (err) {
-        if (typeof runtime.connect !== 'function' || !isRetryableConnectionError(err)) {
+      const state = { awake: false };
+      return sendViaCallback(message, runtime, {
+        limit: limit,
+        delay: delay,
+        wakeMs: options && options.wakeMs,
+        state: state
+      }).catch(function (err) {
+        if (!err || !err.workerAwake || typeof runtime.connect !== 'function' || !isRetryableConnectionError(err)) {
           return Promise.reject(err);
         }
         return sendViaPort(message, runtime, portOptions);
@@ -349,18 +410,16 @@
     if (typeof runtime.sendMessage !== 'function') {
       return Promise.reject(new Error(MESSAGE_UNREACHABLE));
     }
+    const wakeMs = options.wakeMs != null ? options.wakeMs : WAKE_MS;
+    const state = options.state || { awake: false };
     return new Promise(function (resolve, reject) {
       function attempt(index) {
         let settled = false;
-        let wakeTimer = null;
         function fail(err) {
           if (settled) return;
           settled = true;
-          if (wakeTimer != null) {
-            clearTimeout(wakeTimer);
-            wakeTimer = null;
-          }
           const wrapped = rejectError(err);
+          if (state.awake) wrapped.workerAwake = true;
           if (isRetryableConnectionError(wrapped) && index + 1 < options.limit) {
             options.delay(retryDelayMs(index), function () { attempt(index + 1); });
             return;
@@ -397,32 +456,168 @@
             fail(err);
           }
         }
-        let woke = false;
-        function afterWake(err) {
-          if (woke || settled) return;
-          woke = true;
-          if (wakeTimer != null) {
-            clearTimeout(wakeTimer);
-            wakeTimer = null;
-          }
-          if (err && isContextInvalidated(err)) {
-            fail(err);
-            return;
-          }
-          // Next turn: Edge treats a second call in the ping callback as
-          // still attached to the failed channel.
+        // One ping per attempt. A timeout or a dropped ping retries the ping
+        // and does not send the translation on this turn.
+        proveWorkerAwake(runtime, {
+          attempts: 1,
+          delay: options.delay,
+          wakeMs: wakeMs
+        }).then(function () {
+          if (settled) return;
+          state.awake = true;
           setTimeout(deliver, 0);
-        }
-        wakeTimer = setTimeout(afterWake, WAKE_MS);
-        try {
-          wakeExtensionWorker(runtime, afterWake);
-        } catch (err) {
-          if (wakeTimer != null) clearTimeout(wakeTimer);
+        }, function (err) {
           fail(err);
-        }
+        });
       }
       attempt(0);
     });
+  }
+
+  function emptyPort() {
+    return {
+      onDisconnect: { addListener: function () {} },
+      disconnect: function () {}
+    };
+  }
+
+  // Top-frame keepalive. Ping until the worker answers, then open the port
+  // on a later turn. While the tab is visible the port keeps the worker from
+  // going idle between pages and after a tab switch.
+  function createBackgroundConnection(runtime, options) {
+    const proveAttempts = options && options.attempts ? options.attempts : 4;
+    const wakeMs = options && options.wakeMs != null ? options.wakeMs : WAKE_MS;
+    const delay = options && options.delay
+      ? options.delay
+      : function (ms, done) { setTimeout(done, ms); };
+    let desired = true;
+    let port = null;
+    let opening = null;
+    let retryTimer = null;
+    let retryIndex = 0;
+
+    function clearRetry() {
+      if (retryTimer == null) return;
+      clearTimeout(retryTimer);
+      retryTimer = null;
+    }
+
+    function armRetry() {
+      if (!desired || retryTimer != null) return;
+      retryTimer = setTimeout(function () {
+        retryTimer = null;
+        if (!desired || port) return;
+        const again = ensure();
+        if (again && typeof again.catch === 'function') again.catch(function () {});
+      }, retryDelayMs(retryIndex));
+      retryIndex = Math.min(retryIndex + 1, 6);
+      if (retryTimer && typeof retryTimer.unref === 'function') retryTimer.unref();
+    }
+
+    function bindDisconnect(next) {
+      if (!next.onDisconnect || typeof next.onDisconnect.addListener !== 'function') return;
+      next.onDisconnect.addListener(function () {
+        if (port !== next) return;
+        port = null;
+        try { void runtime.lastError; } catch (err) {}
+        if (desired) armRetry();
+      });
+    }
+
+    function ensure() {
+      if (!desired) return Promise.resolve(false);
+      if (port) return Promise.resolve(true);
+      if (opening) return opening;
+      opening = proveWorkerAwake(runtime, {
+        attempts: proveAttempts,
+        delay: delay,
+        wakeMs: wakeMs
+      }).then(function () {
+        return new Promise(function (resolve, reject) {
+          setTimeout(function () {
+            opening = null;
+            if (!desired) {
+              resolve(false);
+              return;
+            }
+            if (port) {
+              retryIndex = 0;
+              resolve(true);
+              return;
+            }
+            let next = null;
+            try {
+              next = runtime.connect({ name: KEEPALIVE_PORT });
+            } catch (err) {
+              if (isContextInvalidated(err)) {
+                desired = false;
+                reject(rejectError(err));
+                return;
+              }
+              armRetry();
+              resolve(false);
+              return;
+            }
+            if (!next || typeof next.disconnect !== 'function') next = emptyPort();
+            port = next;
+            try { bindDisconnect(next); } catch (err) {}
+            // A port that dies in this turn is not a live worker. Do not
+            // report success, and do not open another port synchronously.
+            setTimeout(function () {
+              if (!desired) {
+                resolve(false);
+                return;
+              }
+              if (port !== next) {
+                armRetry();
+                resolve(false);
+                return;
+              }
+              retryIndex = 0;
+              resolve(true);
+            }, 0);
+          }, 0);
+        });
+      }, function (err) {
+        opening = null;
+        if (isContextInvalidated(err)) {
+          desired = false;
+          throw err;
+        }
+        armRetry();
+        throw err;
+      });
+      return opening;
+    }
+
+    function release() {
+      desired = false;
+      clearRetry();
+      const current = port;
+      port = null;
+      opening = null;
+      if (!current) return;
+      try { current.disconnect(); } catch (err) {}
+    }
+
+    function reconnect() {
+      desired = true;
+      clearRetry();
+      const current = port;
+      port = null;
+      if (current) {
+        try { current.disconnect(); } catch (err) {}
+      }
+      return ensure();
+    }
+
+    const ready = ensure();
+    return {
+      ready: ready,
+      ensure: ensure,
+      reconnect: reconnect,
+      release: release
+    };
   }
 
   return {
@@ -436,6 +631,8 @@
     isContextInvalidated: isContextInvalidated,
     userFacingBackgroundError: userFacingBackgroundError,
     wakeExtensionWorker: wakeExtensionWorker,
+    proveWorkerAwake: proveWorkerAwake,
+    createBackgroundConnection: createBackgroundConnection,
     attachTranslatePort: attachTranslatePort
   };
 });

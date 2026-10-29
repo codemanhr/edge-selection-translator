@@ -311,6 +311,52 @@
     });
   }
 
+  function extensionRuntime() {
+    try {
+      return typeof chrome !== 'undefined' ? chrome.runtime : null;
+    } catch (err) {
+      return null;
+    }
+  }
+
+  function isTopFrame() {
+    try { return window.top === window; } catch (err) { return false; }
+  }
+
+  // One keepalive for the visible top frame. A new page, a restored bfcache
+  // page, and a tab switch back to this document all reconnect it. Iframes
+  // share that worker instead of opening a port each.
+  function maintainBackgroundConnection() {
+    if (!isTopFrame() || !ESTNS.createBackgroundConnection) return;
+    let connection = null;
+    function kick() {
+      const runtime = extensionRuntime();
+      if (!runtime) return;
+      if (document.visibilityState === 'hidden') {
+        if (connection) connection.release();
+        connection = null;
+        return;
+      }
+      if (connection) return;
+      connection = ESTNS.createBackgroundConnection(runtime);
+      if (connection.ready && typeof connection.ready.catch === 'function') {
+        connection.ready.catch(function () {});
+      }
+    }
+    kick();
+    document.addEventListener('visibilitychange', kick);
+    window.addEventListener('pageshow', function () {
+      if (!connection || !connection.reconnect) {
+        kick();
+        return;
+      }
+      const pending = connection.reconnect();
+      if (pending && typeof pending.catch === 'function') pending.catch(function () {});
+    });
+  }
+
+  maintainBackgroundConnection();
+
   chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
     if (!message) return undefined;
     // Translate uses the est-translate port. Returning false from a frame

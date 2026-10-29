@@ -11,6 +11,7 @@ const {
   isRetryableConnectionError,
   userFacingBackgroundError,
   wakeExtensionWorker,
+  createBackgroundConnection,
   attachTranslatePort,
   MESSAGE_RELOAD,
   MESSAGE_UNREACHABLE,
@@ -196,8 +197,9 @@ test('reload and connect failure use different panel messages', async function (
   );
 });
 
-test('wake helper rethrows invalidation and ignores a sleeping worker', function () {
+test('wake helper rethrows invalidation and reports a sleeping worker', function () {
   let pings = 0;
+  let reported = null;
   wakeExtensionWorker({
     lastError: { message: 'Receiving end does not exist.' },
     sendMessage: function (message, callback) {
@@ -205,8 +207,11 @@ test('wake helper rethrows invalidation and ignores a sleeping worker', function
       pings += 1;
       callback();
     }
+  }, function (err) {
+    reported = err;
   });
   assert.equal(pings, 1);
+  assert.match(String(reported && reported.message), /Receiving end/);
   assert.throws(function () {
     wakeExtensionWorker({
       sendMessage: function () { throw new Error('Extension context invalidated.'); }
@@ -215,6 +220,8 @@ test('wake helper rethrows invalidation and ignores a sleeping worker', function
   assert.doesNotThrow(function () {
     wakeExtensionWorker({
       sendMessage: function () { throw new Error('Could not establish connection. Receiving end does not exist.'); }
+    }, function (err) {
+      assert.match(String(err && err.message), /Receiving end/);
     });
   });
 });
@@ -379,6 +386,7 @@ test('the worker answers translate on a port and keeps the panel request', funct
   assert.match(worker, /est-keepalive/);
   assert.match(worker, /attachTranslatePort/);
   assert.match(worker, /est-ping/);
+  assert.match(worker, /holdWorkerForFollowUp/);
   assert.match(worker, /\}, 400\)/);
   assert.match(worker, /message\.type === 'translate'/);
   assert.match(worker, /return true/);
@@ -392,4 +400,108 @@ test('the worker answers translate on a port and keeps the panel request', funct
   assert.match(content, /userFacingBackgroundError/);
   assert.match(content, /message\.type === 'translate' \|\| message\.type === 'est-ping'\) return undefined/);
   assert.doesNotMatch(content, /message\.type === 'translate'\) return false/);
+  assert.match(content, /createBackgroundConnection/);
+  assert.match(content, /pageshow/);
+  assert.match(content, /visibilitychange/);
+});
+
+test('translate is not sent until a ping is answered', async function () {
+  const order = [];
+  let pings = 0;
+  const runtime = {
+    lastError: undefined,
+    sendMessage: function (message, callback) {
+      order.push(message.type);
+      if (message.type === 'est-ping') {
+        pings += 1;
+        if (pings === 1) {
+          runtime.lastError = { message: 'Could not establish connection. Receiving end does not exist.' };
+          callback(undefined);
+          return;
+        }
+        runtime.lastError = undefined;
+        callback({ ok: true });
+        return;
+      }
+      callback({ ok: true, translatedText: '你好' });
+    },
+    connect: function () {
+      throw new Error('connect should not run when sendMessage can succeed');
+    }
+  };
+  const response = await sendExtensionMessage({ type: 'translate', text: 'Hi' }, runtime, {
+    delay: immediate,
+    wakeMs: 40,
+    attempts: 3
+  });
+  assert.equal(response.translatedText, '你好');
+  assert.deepEqual(order, ['est-ping', 'est-ping', 'translate']);
+});
+
+test('an unanswered ping does not send translate', async function () {
+  let translates = 0;
+  let pings = 0;
+  const runtime = {
+    sendMessage: function (message, callback) {
+      if (message.type === 'est-ping') {
+        pings += 1;
+        return;
+      }
+      translates += 1;
+      callback({ ok: true });
+    }
+  };
+  await assert.rejects(
+    sendExtensionMessage({ type: 'translate' }, runtime, { attempts: 2, delay: immediate, wakeMs: 20 }),
+    /Receiving end does not exist/
+  );
+  assert.equal(pings, 2);
+  assert.equal(translates, 0);
+});
+
+test('keepalive port opens on the turn after a proven ping', async function () {
+  const order = [];
+  const runtime = {
+    lastError: undefined,
+    sendMessage: function (message, callback) {
+      order.push('ping-call');
+      assert.equal(message.type, 'est-ping');
+      callback({ ok: true });
+      order.push('ping-callback');
+    },
+    connect: function (info) {
+      order.push('connect');
+      assert.equal(info.name, 'est-keepalive');
+      return {
+        onDisconnect: { addListener: function () {} },
+        disconnect: function () { order.push('disconnect'); }
+      };
+    }
+  };
+  const connection = createBackgroundConnection(runtime, { delay: immediate, attempts: 2, wakeMs: 30 });
+  assert.deepEqual(order, ['ping-call', 'ping-callback']);
+  assert.equal(await connection.ready, true);
+  assert.deepEqual(order, ['ping-call', 'ping-callback', 'connect']);
+  connection.release();
+  assert.ok(order.includes('disconnect'));
+});
+
+test('a dropped ping does not open the keepalive port', async function () {
+  let connects = 0;
+  let pings = 0;
+  const runtime = {
+    lastError: undefined,
+    sendMessage: function (message, callback) {
+      pings += 1;
+      runtime.lastError = { message: 'Could not establish connection. Receiving end does not exist.' };
+      callback(undefined);
+    },
+    connect: function () { connects += 1; }
+  };
+  const connection = createBackgroundConnection(runtime, { delay: immediate, attempts: 2, wakeMs: 30 });
+  assert.equal(connects, 0);
+  await assert.rejects(connection.ready, /Receiving end/);
+  connection.release();
+  assert.equal(pings, 2);
+  assert.equal(connects, 0);
 });
